@@ -1,0 +1,39 @@
+## Interface: 16001
+## X-Curse-Project-ID: 0
+## Title: EzWoW - Quest
+## Title-enUS: EzWoW - Quest
+## Title-koKR: EzWoW - Quest
+## Title-deDE: EzWoW - Quest
+## Title-frFR: EzWoW - Quest
+## Title-esES: EzWoW - Quest
+## Title-esMX: EzWoW - Quest
+## Title-ruRU: EzWoW - Quest
+## Title-zhCN: EzWoW - Quest
+## Title-zhTW: EzWoW - Quest
+## Notes: Quest tracker, auto accept/turn-in, best reward mark, party progress messages, and quest objective & turn-in spots on the map and minimap (/ezq)
+## Notes-enUS: Quest tracker, auto accept/turn-in, best reward mark, party progress messages, and quest objective & turn-in spots on the map and minimap (/ezq)
+## Notes-koKR: 퀘스트 추적기·자동 수락/완료·최고 보상 표시·파티 진행 알림·지도와 미니맵의 퀘스트 목표·완료 위치 표시 (/ezq)
+## Notes-deDE: Questverfolgung, automatisches Annehmen/Abgeben, beste Belohnung, Gruppenmeldungen und Questziele & Abgabeorte auf Karte und Minikarte (/ezq)
+## Notes-frFR: Suivi des quêtes, acceptation/rendu automatiques, meilleure récompense, annonces au groupe et objectifs & lieux de remise sur la carte et la minicarte (/ezq)
+## Notes-esES: Seguimiento de misiones, aceptar/entregar automático, mejor recompensa, avisos al grupo y objetivos y entregas en el mapa y el minimapa (/ezq)
+## Notes-esMX: Seguimiento de misiones, aceptar/entregar automático, mejor recompensa, avisos al grupo y objetivos y entregas en el mapa y el minimapa (/ezq)
+## Notes-ruRU: Список заданий, автопринятие и сдача, лучшая награда, сообщения группе, цели и места сдачи на карте и миникарте (/ezq)
+## Notes-zhCN: 任务追踪、自动接受/交付、最佳奖励标记、队伍进度通报，以及地图和小地图上的任务目标与交付地点 (/ezq)
+## Notes-zhTW: 任務追蹤、自動接受/交付、最佳獎勵標記、隊伍進度通報，以及地圖和小地圖上的任務目標與交付地點 (/ezq)
+## Author: qqhrqqhr2
+## Version: 1.0.0
+## Category: EzWoW
+## IconTexture: Interface\AddOns\EzWoW-Quest\Media\Icon
+## SavedVariables: EzWoW_QuestDB
+## OptionalDeps: EzWoW-MapFinder, EzWoW-FrameMover
+
+Core\Locales.lua
+Core\UIKit.lua
+Core\Init.lua
+UI\LanguageDropdown.lua
+Modules\QuestAutomation.lua
+Modules\QuestAnnounce.lua
+Modules\QuestLogPins.lua
+Modules\QuestObjectivePins.lua
+UI\QuestTracker.lua
+UI\OptionsWindow.lua
