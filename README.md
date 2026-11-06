@@ -2,8 +2,8 @@
 
 ## CurseForge
 
-- **Project ID / 프로젝트 ID:** `0` (not created yet / 아직 만들지 않음)
-- **Project page / 프로젝트 페이지:** EzWoW-Quest (link added after the project is created / 프로젝트를 만든 뒤 추가)
+- **Project ID / 프로젝트 ID:** `1787488`
+- **Project page / 프로젝트 페이지:** [EzWoW-Quest](https://www.curseforge.com/wow/addons/ezwow-quest)
 
 **[한국어](#한국어) · [English](#english)**
 
