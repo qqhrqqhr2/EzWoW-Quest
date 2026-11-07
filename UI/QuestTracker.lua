@@ -672,7 +672,13 @@ function ObjectiveTrackerController.ensureQuestOverlay()
     end)
     -- unmodified left click: done by the secure "click" action (type1)
     overlay:SetScript("PostClick", function(self, button)
-        if button == "LeftButton" and not (IsModifierKeyDown and IsModifierKeyDown()) then return end
+        if button == "LeftButton" and not (IsModifierKeyDown and IsModifierKeyDown()) then
+            -- after the quest log has opened: guide to the nearest place to go
+            local data = self.line and self.line.questData
+            local qop = ns.QuestObjectivePins
+            if data and data.questID and qop and qop.requestGuide then qop.requestGuide(data.questID) end
+            return
+        end
         local line = self.line
         local handler = line and line:GetScript("OnClick")
         if handler then handler(line, button) end
@@ -736,6 +742,48 @@ end
 
 -- Without a secure target (or in combat, where the overlay is off) the line's
 -- own click lands here.
+-- The quest log's texts for the tooltip: the short "what to do" text and the
+-- story (cut at about 360 bytes, on a whole character). nil when not readable.
+local STORY_BYTES = 360
+local function shortenText(text, limit)
+    if #text <= limit then return text end
+    local cut = limit
+    -- step back to the first byte of a UTF-8 character
+    while cut > 1 do
+        local byte = text:byte(cut + 1)
+        if not byte or byte < 0x80 or byte >= 0xC0 then break end
+        cut = cut - 1
+    end
+    return text:sub(1, cut) .. "…"
+end
+
+function ObjectiveTrackerController.questLogTexts(questData)
+    if type(GetQuestLogQuestText) ~= "function" or not questData or not questData.questID then return nil end
+    local logIndex = questData.logIndex
+    if (not logIndex or logIndex <= 0) and C_QuestLog and C_QuestLog.GetLogIndexForQuestID then
+        local ok, index = pcall(C_QuestLog.GetLogIndexForQuestID, questData.questID)
+        logIndex = ok and index or nil
+    end
+    if type(logIndex) ~= "number" or (issecretvalue and issecretvalue(logIndex)) then return nil end
+    local ok, story, summary = pcall(GetQuestLogQuestText, logIndex)
+    if not ok then return nil end
+    local function clean(text)
+        if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then return nil end
+        text = text:gsub("^%s+", ""):gsub("%s+$", "")
+        return text ~= "" and text or nil
+    end
+    summary, story = clean(summary), clean(story)
+    if story then story = shortenText(story, STORY_BYTES) end
+    return summary, story
+end
+
+-- Background and frame are drawn unless turned off, or while the list is
+-- locked (a locked window shows only its contents, like the other EzWoW windows).
+function ObjectiveTrackerController.isSolid(savedDB)
+    if ObjectiveTrackerController.hoverActive then return true end
+    return savedDB.trackerShowBg ~= false and not savedDB.trackerLocked
+end
+
 function ObjectiveTrackerController.launchQuestInLog(questData)
     if not questData or not questData.questID then return end
     if ObjectiveTrackerController.hasInCombat() then
@@ -1009,6 +1057,8 @@ function ObjectiveTrackerController.startTrackerDrag()
     if not trackerFrame or hasResizingTracker then return end
     local savedDB = ns:InitializeDatabase()
     if savedDB.enableMove == false then return end
+    -- like the other EzWoW windows: a locked list still moves with Ctrl + drag
+    if savedDB.trackerLocked and not (IsControlKeyDown and IsControlKeyDown()) then return end
     if savedDB.requireCtrl and not (IsControlKeyDown and IsControlKeyDown()) then return end
     if ObjectiveTrackerController.hasInCombat() and trackerFrame:IsProtected() then return end
     trackerFrame.isDragging = true
@@ -1025,7 +1075,7 @@ end
 function ObjectiveTrackerController.onTrackerMouseWheel(_, delta)
     local savedDB = ns:InitializeDatabase()
     if IsControlKeyDown and IsControlKeyDown() then
-        if savedDB.enableScale == false then return end
+        if savedDB.enableScale == false or savedDB.trackerLocked then return end
         if ObjectiveTrackerController.hasInCombat() and trackerFrame:IsProtected() then return end
         local currentState = tonumber(savedDB.trackerScale) or (trackerFrame and trackerFrame:GetScale()) or 1.0
         local nextScale = math.floor((currentState + (delta > 0 and 0.05 or -0.05)) * 100 + 0.5) / 100
@@ -1071,6 +1121,52 @@ function ObjectiveTrackerController.handleQuickResetClick(button)
         return true
     end
     return false
+end
+
+-----------------------------------------------------------------------------
+-- Party quest status (Modules/QuestShare.lua): "[2/4]" at the end of a quest
+-- line (party members that have it / party members the client answered for)
+-- and one tooltip line per member. Only in a party, with the option on.
+-----------------------------------------------------------------------------
+local PARTY_HEX_ALL = "|cff40ff59"
+local PARTY_HEX_SOME = "|cffaaaaff"
+local PARTY_HEX_NONE = "|cff8a949b"
+
+function ObjectiveTrackerController.resolvePartySuffix(questData)
+    local share = ns.QuestShare
+    if not (share and questData and questData.questID and share.PartyStatusEnabled()) then return "" end
+    local have, known = share.GetPartyStatus(questData.questID, questData.logIndex)
+    if not have then return "" end
+    local hex = (have >= known and PARTY_HEX_ALL) or (have > 0 and PARTY_HEX_SOME) or PARTY_HEX_NONE
+    return string.format(" %s[%d/%d]|r", hex, have, known)
+end
+
+function ObjectiveTrackerController.addPartyTooltipLines(questData)
+    local share = ns.QuestShare
+    if not (share and questData and questData.questID and share.PartyStatusEnabled()) then return end
+    local have, known, members = share.GetPartyStatus(questData.questID, questData.logIndex)
+    if not members then return end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(string.format("%s (%d/%d)", ns:L("TRACKER_TT_PARTY"), have, known), STYLE.accent[1], STYLE.accent[2], STYLE.accent[3])
+    for _, member in ipairs(members) do
+        if member.has then
+            GameTooltip:AddDoubleLine(member.name, ns:L("TRACKER_PARTY_HAS"), STYLE.text[1], STYLE.text[2], STYLE.text[3], 0.25, 1, 0.35)
+        else
+            GameTooltip:AddDoubleLine(member.name, ns:L("TRACKER_PARTY_MISSING"), STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3], 0.54, 0.58, 0.61)
+        end
+    end
+end
+
+-- party members' quest logs change often: one tracker refresh per half second
+local partyRefreshPending = false
+function ObjectiveTrackerController.schedulePartyRefresh()
+    if partyRefreshPending then return end
+    if ns:InitializeDatabase().trackerPartyStatus == false then return end
+    partyRefreshPending = true
+    C_Timer.After(0.5, function()
+        partyRefreshPending = false
+        ns:ScheduleTrackerUpdate()
+    end)
 end
 
 function ObjectiveTrackerController.acquireTrackerRowWidget(index)
@@ -1128,6 +1224,16 @@ function ObjectiveTrackerController.acquireTrackerRowWidget(index)
             if priorityQueue.zoneName then
                 GameTooltip:AddLine(priorityQueue.zoneName, STYLE.accent[1], STYLE.accent[2], STYLE.accent[3])
             end
+            -- what to do (the quest log's short text) and the story, shortened
+            local summary, story = ObjectiveTrackerController.questLogTexts(priorityQueue)
+            if summary then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine(summary, 1, 0.94, 0.78, true)
+            end
+            if story then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine(story, STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3], true)
+            end
             if priorityQueue.objectives and #priorityQueue.objectives > 0 then
                 GameTooltip:AddLine(" ")
                 for _, obj in ipairs(priorityQueue.objectives) do
@@ -1135,14 +1241,18 @@ function ObjectiveTrackerController.acquireTrackerRowWidget(index)
                     GameTooltip:AddLine("• " .. cHex .. (obj.text or "") .. "|r", 1, 1, 1, true)
                 end
             end
+            ObjectiveTrackerController.addPartyTooltipLines(priorityQueue)
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(ns:L("TRACKER_TT_QUEST_LCLICK"), STYLE.text[1], STYLE.text[2], STYLE.text[3])
             GameTooltip:AddLine(ns:L("TRACKER_TT_QUEST_SHIFT"), STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3])
+            GameTooltip:AddLine(ns:L("TRACKER_TT_QUEST_SHARE"), STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3])
             GameTooltip:AddLine(ns:L("TRACKER_TT_QUEST_RCLICK"), STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3])
             if maxScrollOffset > 0 then
                 GameTooltip:AddLine(ns:L("TRACKER_TT_SCROLL"), STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3])
             end
+            GameTooltip:AddDoubleLine(" ", "EzWoW - Quest", 0, 0, 0, 0.5, 0.5, 0.5)
             GameTooltip:Show()
+            if _G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.Refit then pcall(_G.EzWoWTooltipTagSizer.Refit, GameTooltip) end
         end
         ObjectiveTrackerController.showQuestOverlay(self)
     end)
@@ -1296,7 +1406,7 @@ function ObjectiveTrackerController.attachResizeHandlers(handle, mode)
             if resizeGripBL and resizeGripBL.SetHighlightState then resizeGripBL:SetHighlightState(false) end
             local savedDB = ns:InitializeDatabase()
             if bodyFrame then
-                if savedDB.trackerShowBg ~= false then
+                if ObjectiveTrackerController.isSolid(savedDB) then
                     bodyFrame:SetBackdropBorderColor(unpack(STYLE.border))
                 else
                     bodyFrame:SetBackdropBorderColor(0, 0, 0, 0)
@@ -1410,21 +1520,60 @@ function ObjectiveTrackerController.prepareTrackerFrame()
     accentLine:SetPoint("BOTTOMLEFT", headerBtn, "BOTTOMLEFT", 1, 0)
     accentLine:SetPoint("BOTTOMRIGHT", headerBtn, "BOTTOMRIGHT", -1, 0)
     ObjectiveTrackerController.assignSolidColor(accentLine, unpack(STYLE.accent))
-
-    local iconTex = headerBtn:CreateTexture(nil, "ARTWORK")
-    iconTex:SetSize(16, 16)
-    iconTex:SetPoint("LEFT", headerBtn, "LEFT", 6, 0)
-    iconTex:SetTexture(ICON_PATH)
+    headerBtn.accentLine = accentLine
 
     local headerText = headerBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    headerText:SetPoint("LEFT", iconTex, "RIGHT", 6, 0)
-    headerText:SetTextColor(unpack(STYLE.text))
+    headerText:SetPoint("LEFT", headerBtn, "LEFT", 8, 0)
+    headerText:SetTextColor(unpack(STYLE.accent))
     headerBtn.text = headerText
 
     local switchSign = headerBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     switchSign:SetPoint("RIGHT", headerBtn, "RIGHT", -8, 0)
     switchSign:SetTextColor(unpack(STYLE.accent))
     headerBtn.toggleSign = switchSign
+
+    -- lock: position and size stay as they are
+    -- the same square button as the other EzWoW windows' lock
+    local lockBtn = CreateFrame("Button", nil, headerBtn, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    lockBtn:SetSize(23, 23)
+    lockBtn:SetPoint("RIGHT", switchSign, "LEFT", -6, 0)
+    if lockBtn.SetBackdrop then
+        lockBtn:SetBackdrop(FLAT_BACKDROP)
+        lockBtn:SetBackdropColor(0.114, 0.157, 0.192, 0.92)
+        lockBtn:SetBackdropBorderColor(0.204, 0.298, 0.357, 0.95)
+    end
+    lockBtn.icon = lockBtn:CreateTexture(nil, "ARTWORK")
+    lockBtn.icon:SetPoint("TOPLEFT", 3, -3)
+    lockBtn.icon:SetPoint("BOTTOMRIGHT", -3, 3)
+    lockBtn:SetScript("OnClick", function()
+        local savedDB = ns:InitializeDatabase()
+        savedDB.trackerLocked = not savedDB.trackerLocked or nil
+        ns:UpdateQuestTracker()
+        if GameTooltip and GameTooltip:GetOwner() == lockBtn then lockBtn:GetScript("OnEnter")(lockBtn) end
+    end)
+    lockBtn:SetScript("OnEnter", function(self)
+        if self.SetBackdropColor then
+            self:SetBackdropColor(0.16, 0.24, 0.26, 0.98)
+            self:SetBackdropBorderColor(STYLE.accent[1], STYLE.accent[2], STYLE.accent[3], 1)
+        end
+        if not GameTooltip then return end
+        local locked = ns:InitializeDatabase().trackerLocked
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(ns:L(locked and "TRACKER_LOCKED" or "TRACKER_UNLOCKED"), STYLE.accent[1], STYLE.accent[2], STYLE.accent[3])
+        GameTooltip:AddLine(ns:L("TRACKER_LOCK_TIP"), STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3], true)
+        GameTooltip:AddDoubleLine(" ", "EzWoW - Quest", 0, 0, 0, 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+        if _G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.Refit then pcall(_G.EzWoWTooltipTagSizer.Refit, GameTooltip) end
+    end)
+    lockBtn:SetScript("OnLeave", function(self)
+        if self.SetBackdropColor then
+            self:SetBackdropColor(0.114, 0.157, 0.192, 0.92)
+            self:SetBackdropBorderColor(0.204, 0.298, 0.357, 0.95)
+        end
+        if GameTooltip then GameTooltip:Hide() end
+    end)
+    headerBtn.lockBtn = lockBtn
+    lockBtn:Hide()
 
     headerBtn:SetScript("OnEnter", function(self)
         self:SetBackdropBorderColor(unpack(STYLE.accent))
@@ -1448,7 +1597,11 @@ function ObjectiveTrackerController.prepareTrackerFrame()
         end
     end)
     headerBtn:SetScript("OnLeave", function(self)
-        self:SetBackdropBorderColor(unpack(STYLE.border))
+        if ObjectiveTrackerController.isSolid(ns:InitializeDatabase()) then
+            self:SetBackdropBorderColor(unpack(STYLE.border))
+        else
+            self:SetBackdropBorderColor(0, 0, 0, 0)
+        end
         if GameTooltip then GameTooltip:Hide() end
     end)
     headerBtn:SetScript("OnClick", function(_, button)
@@ -1607,13 +1760,41 @@ function ns:UpdateQuestTracker()
     local expanded = savedDB.trackerExpanded ~= false
     local presentZoneAndLevel = savedDB.trackerShowZone ~= false
 
-    local baseTitle = string.format(self:L("TRACKER_HEADER_FORMAT"), totalActive, maxQuests)
+    local baseTitle = string.format("EzWoW - Quest  |cffa7b9c5%d/%d|r", totalActive, maxQuests)
     if hasResizingTracker then
         headerBtn.text:SetText(string.format("%s (%d×%d)", baseTitle, userWidth, userBodyHeight))
     else
         headerBtn.text:SetText(baseTitle)
     end
     headerBtn.toggleSign:SetText(expanded and "[-]" or "[+]")
+    -- lock button and resize handles
+    local locked = savedDB.trackerLocked and true or false
+    local hovered = ObjectiveTrackerController.hoverActive and true or false
+    if headerBtn.lockBtn then headerBtn.lockBtn:SetShown(hovered) end
+    if headerBtn.lockBtn then
+        headerBtn.lockBtn.icon:SetTexture("Interface\\AddOns\\EzWoW-Quest\\Media\\" .. (locked and "lock" or "unlock") .. ".tga")
+    end
+    if not ObjectiveTrackerController.hasInCombat() then
+        for _, handle in ipairs({ resizeGripBR, resizeGripBL, resizeBarBottom }) do
+            if handle then handle:SetShown(not locked) end
+        end
+    end
+    -- see-through: header, border and scroll bar too, only the text stays
+    local solid = ObjectiveTrackerController.isSolid(savedDB)
+    headerBtn:SetBackdropColor(unpack(solid and STYLE.header or { 0, 0, 0, 0 }))
+    headerBtn:SetBackdropBorderColor(unpack(solid and STYLE.border or { 0, 0, 0, 0 }))
+    if headerBtn.accentLine then headerBtn.accentLine:SetShown(solid) end
+    -- the scroll thumb too: only the quest text stays (the wheel still scrolls)
+    if scrollThumb then scrollThumb:SetAlpha(solid and 1 or 0) end
+    if scrollBar and scrollBar.SetBackdropColor then
+        if solid then
+            scrollBar:SetBackdropColor(0.05, 0.07, 0.09, 0.85)
+            scrollBar:SetBackdropBorderColor(STYLE.border[1], STYLE.border[2], STYLE.border[3], 0.75)
+        else
+            scrollBar:SetBackdropColor(0, 0, 0, 0)
+            scrollBar:SetBackdropBorderColor(0, 0, 0, 0)
+        end
+    end
 
     if not expanded then
         ObjectiveTrackerController.dismissUnusedPools(0, 0)
@@ -1626,9 +1807,13 @@ function ns:UpdateQuestTracker()
     if hasResizingTracker then
         bodyFrame:SetBackdropColor(STYLE.bgMain[1], STYLE.bgMain[2], STYLE.bgMain[3], math.max(0.65, STYLE.bgMain[4]))
         bodyFrame:SetBackdropBorderColor(unpack(STYLE.accent))
-    elseif savedDB.trackerShowBg ~= false then
+    elseif ObjectiveTrackerController.isSolid(savedDB) then
         bodyFrame:SetBackdropColor(unpack(STYLE.bgMain))
         bodyFrame:SetBackdropBorderColor(unpack(STYLE.border))
+        if ObjectiveTrackerController.hoverActive then
+            bodyFrame:SetBackdropColor(STYLE.bgMain[1], STYLE.bgMain[2], STYLE.bgMain[3], 0.88)
+            bodyFrame:SetBackdropBorderColor(STYLE.accent[1], STYLE.accent[2], STYLE.accent[3], 0.90)
+        end
     else
         bodyFrame:SetBackdropColor(0, 0, 0, 0)
         bodyFrame:SetBackdropBorderColor(0, 0, 0, 0)
@@ -1749,7 +1934,8 @@ function ns:UpdateQuestTracker()
                         stateSuffix = " |cffff5555" .. self:L("TRACKER_FAILED_TAG") .. "|r"
                     end
 
-                    qLine.text:SetText(focusMark .. diffHex .. lvPrefix .. (priorityQueue.title or "") .. "|r" .. stateSuffix)
+                    local partySuffix = ObjectiveTrackerController.resolvePartySuffix(priorityQueue)
+                    qLine.text:SetText(focusMark .. diffHex .. lvPrefix .. (priorityQueue.title or "") .. "|r" .. stateSuffix .. partySuffix)
 
                     local qhVal = math.max(15, (qLine.text:GetStringHeight() or 13) + 2)
                     qLine:SetSize(math.max(90, innerWidth - 8 - itemIndent), qhVal)
@@ -1762,13 +1948,18 @@ function ns:UpdateQuestTracker()
                                     ObjectiveTrackerController.dismissOrUntrackQuest(priorityQueue)
                                 end
                             elseif IsControlKeyDown and IsControlKeyDown() then
-                                if C_SuperTrack and type(C_SuperTrack.SetSuperTrackedQuestID) == "function" then
-                                    local super = C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()
-                                    pcall(C_SuperTrack.SetSuperTrackedQuestID, super == priorityQueue.questID and 0 or priorityQueue.questID)
-                                    ns:UpdateQuestTracker()
+                                ObjectiveTrackerController.launchQuestInLog(priorityQueue)
+                            elseif IsAltKeyDown and IsAltKeyDown() then
+                                if ns.QuestShare then
+                                    ns.QuestShare.Share(priorityQueue.questID, priorityQueue.logIndex, false)
                                 end
                             else
-                                ObjectiveTrackerController.launchQuestInLog(priorityQueue)
+                                -- guide to the nearest place to go; the quest log when there is none
+                                local qop = ns.QuestObjectivePins
+                                local guided = qop and qop.guideTo and qop.guideTo(priorityQueue.questID)
+                                if not guided then
+                                    ObjectiveTrackerController.launchQuestInLog(priorityQueue)
+                                end
                             end
                         elseif button == "RightButton" then
                             if IsAltKeyDown and IsAltKeyDown() then
@@ -1896,6 +2087,7 @@ for _, eventFrame in ipairs({
     "QUEST_TURNED_IN",
     "SUPER_TRACKING_CHANGED",
     "UNIT_QUEST_LOG_CHANGED",
+    "GROUP_ROSTER_UPDATE",
     "BAG_UPDATE_DELAYED",
     "ZONE_CHANGED_NEW_AREA",
 }) do
@@ -1903,7 +2095,14 @@ for _, eventFrame in ipairs({
 end
 
 trackerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
-    if event == "UNIT_QUEST_LOG_CHANGED" and arg1 ~= "player" then
+    if event == "UNIT_QUEST_LOG_CHANGED" then
+        if type(arg1) ~= "string" or (type(issecretvalue) == "function" and issecretvalue(arg1)) then return end
+        if arg1 ~= "player" then
+            if arg1:find("^party%d") then ObjectiveTrackerController.schedulePartyRefresh() end
+            return
+        end
+    elseif event == "GROUP_ROSTER_UPDATE" then
+        ObjectiveTrackerController.schedulePartyRefresh()
         return
     end
     if event == "PLAYER_LOGIN" then
@@ -1943,4 +2142,23 @@ trackerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
         end
     end
     ns:ScheduleTrackerUpdate()
+end)
+
+-- The mouse anywhere on the list shows its frame, background and lock button;
+-- leaving it puts back the normal look (see-through while locked).
+local hoverWatch = CreateFrame("Frame")
+local hoverElapsed = 0
+hoverWatch:SetScript("OnUpdate", function(_, elapsed)
+    hoverElapsed = hoverElapsed + (elapsed or 0)
+    if hoverElapsed < 0.1 then return end
+    hoverElapsed = 0
+    local over = false
+    if trackerFrame and trackerFrame:IsShown() then
+        over = trackerFrame:IsMouseOver() or (questOverlay and questOverlay:IsShown() and questOverlay:IsMouseOver()) or false
+        if trackerFrame.isDragging or hasResizingTracker then over = true end
+    end
+    if over ~= (ObjectiveTrackerController.hoverActive or false) then
+        ObjectiveTrackerController.hoverActive = over
+        ns:UpdateQuestTracker()
+    end
 end)

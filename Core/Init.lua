@@ -29,6 +29,8 @@ ns.DEFAULTS = {
     trackerTrackAll = true,
     trackerShowZone = true,
     trackerShowBg = true,
+    trackerLocked = false,
+    npcQuestTooltip = true,  -- quests at an NPC on its tooltip and on the minimap tooltip   -- position and size can't be changed (header lock button)
     trackerExpanded = true,
     trackerWidth = 270,
     trackerHeight = 360,
@@ -43,6 +45,9 @@ ns.DEFAULTS = {
     questSkipItems = false,
     questPartyAnnounce = true,
     questMarkBest = true,
+    -- quest sharing and party quest status
+    questAutoShare = false,
+    trackerPartyStatus = true,
     -- map and minimap marks
     questLogPins = true,
     questLogPinsAll = false,

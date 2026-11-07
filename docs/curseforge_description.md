@@ -19,11 +19,11 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker, aut
 
 ### Quest tracker
 - Replaces the default objective tracker (can be switched back in the settings).
-- Quests grouped by zone, with difficulty-coloured `[Lv]` and `(Complete)` / `(Failed)` at once.
+- Quests grouped by zone, with difficulty-coloured `[Lv]` (dungeons read `[16D]`, elite quests `[21+]`) and `(Complete)` / `(Failed)` at once.
 - Objectives change colour as you progress: white → orange → yellow → green.
 - Quests with a usable item get an item button you can click directly.
 - Drag to move, Ctrl + mouse wheel to scale (50–150%), drag the bottom corner to resize, mouse wheel to scroll.
-- Left-click a quest: quest log · Ctrl + left-click: focus · Shift + left-click: chat link · right-click: fold objectives · Alt + right-click: hide.
+- Left-click a quest: quest log · Ctrl + left-click: focus · Shift + left-click: chat link · Alt + left-click: share · right-click: fold objectives · Alt + right-click: hide.
 
 ### Quest automation (off by default)
 - Auto accept quests, including shared and escort quest confirmations. Hold **Shift** while talking to skip.
@@ -34,10 +34,15 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker, aut
 ### Party progress messages
 - Tells your party (or instance group) when you accept a quest, make progress, finish the objectives and turn it in. Never sent in a raid.
 
+### Quest sharing and party status
+- Alt + left-click a quest in the tracker to share it with your party.
+- Optional: share a quest automatically when you accept it while in a group (off by default).
+- In a party, each quest line shows how many members also have it (for example `[2/4]`); hover to see who has it.
+
 ### Map and minimap marks (needs EzWoW - Map Finder)
-- **Red dots**: creatures to kill. Nearby dots are joined by thin lines, so a hunting ground reads as one area.
-- **Gold dots**: objects and items to collect or use. **Hollow gold ring**: the game's own quest area.
-- **Yellow `?`**: where to turn in quests whose objectives are done (grey `?` for quests in progress, optional).
+- **Objective dots, one colour per quest**: where the creatures to kill and the things to collect or use are. Nearby dots are joined by thin lines of the same colour, so a hunting ground reads as one area, and the quest name in the tooltip uses the same colour.
+- **Hollow gold ring**: the game's own quest area, for quests without objective dots.
+- **`?` badge**: where to turn in quests whose objectives are done, a yellow `?` in a small dark badge with a gold rim (grey `?` for quests in progress, optional).
 - Nearby dots also show on the minimap. Hover for the quest and objective, click to set a waypoint.
 
 ## Working with other EzWoW addons
@@ -68,11 +73,11 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 스크�
 
 ### 퀘스트 추적기
 - 기본 퀘스트 추적창 대신 사용합니다(설정에서 기본 추적창으로 되돌릴 수 있음).
-- 퀘스트를 지역별로 묶고 `[레벨]`을 난이도 색으로, `(완료)`·`(실패)`를 바로 표시합니다.
+- 퀘스트를 지역별로 묶고 `[레벨]`을 난이도 색으로(던전은 `[16D]`, 정예는 `[21+]`처럼), `(완료)`·`(실패)`를 바로 표시합니다.
 - 목표 진행에 따라 색이 바뀝니다: 흰색 → 주황 → 노랑 → 초록.
 - 사용 아이템이 있는 퀘스트는 아이템 버튼을 눌러 바로 씁니다.
 - 끌어서 이동, Ctrl + 마우스 휠로 크기(50~150%), 아래 모서리를 끌어 가로·세로 크기 조절, 마우스 휠로 스크롤.
-- 퀘스트 좌클릭: 퀘스트 로그 · Ctrl + 좌클릭: 집중 추적 · Shift + 좌클릭: 채팅 링크 · 우클릭: 목표 접기 · Alt + 우클릭: 숨기기.
+- 퀘스트 좌클릭: 퀘스트 로그 · Ctrl + 좌클릭: 집중 추적 · Shift + 좌클릭: 채팅 링크 · Alt + 좌클릭: 공유 · 우클릭: 목표 접기 · Alt + 우클릭: 숨기기.
 
 ### 퀘스트 자동화 (처음에는 꺼짐)
 - 퀘스트 자동 수락(공유·호위 퀘스트 확인 포함). 대화할 때 **Shift**를 누르고 있으면 건너뜁니다.
@@ -83,10 +88,15 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 스크�
 ### 파티 진행 알림
 - 파티(인스턴스 그룹)에 퀘스트 수락·목표 진행·목표 달성·완료를 알립니다. 공격대에서는 보내지 않습니다.
 
+### 퀘스트 공유와 파티원 보유 표시
+- 추적기에서 퀘스트를 Alt + 좌클릭하면 파티에 공유합니다.
+- 옵션: 파티 중에 퀘스트를 수락하면 자동으로 공유합니다(처음에는 꺼짐).
+- 파티 중에는 퀘스트 줄마다 같은 퀘스트를 가진 파티원 수를 보여 줍니다(예: `[2/4]`). 마우스를 올리면 누가 가졌는지 나옵니다.
+
 ### 지도·미니맵 표시 (EzWoW - Map Finder 필요)
-- **빨간 점**: 처치할 몬스터. 가까운 점은 가는 선으로 이어 사냥터 범위를 보여 줍니다.
-- **금색 점**: 모으거나 사용할 오브젝트·아이템. **속이 빈 금색 고리**: 게임이 알려 주는 퀘스트 지역.
-- **노란 `?`**: 목표를 다 채운 퀘스트의 보고 위치(옵션을 켜면 진행 중인 퀘스트는 회색 `?`).
+- **퀘스트마다 다른 색의 목표 위치 점**: 처치할 몬스터와 모으거나 사용할 대상의 자리. 가까운 점은 같은 색 선으로 이어 사냥터 범위를 보여 주고, 툴팁의 퀘스트 이름도 같은 색으로 나옵니다.
+- **속이 빈 금색 고리**: 목표 위치 점이 없는 퀘스트의 퀘스트 지역(게임이 알려 주는 위치).
+- **`?` 표시**: 목표를 다 채운 퀘스트의 보고 위치. 금색 테두리의 작은 어두운 원 안에 노란 `?`(옵션을 켜면 진행 중인 퀘스트는 회색 `?`).
 - 가까운 점은 미니맵에도 표시합니다. 마우스를 올리면 퀘스트와 목표, 클릭하면 웨이포인트.
 
 ## 다른 EzWoW 애드온과 함께 쓰기

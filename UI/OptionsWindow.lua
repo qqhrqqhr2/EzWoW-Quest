@@ -259,7 +259,7 @@ function ns:CreateSettingsWindow()
     if settingsFrame then return settingsFrame end
 
     local windowFrame = CreateFrame("Frame", SETTINGS_NAME, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    windowFrame:SetSize(480, 514)
+    windowFrame:SetSize(480, 537)
     windowFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     windowFrame:SetFrameStrata("FULLSCREEN_DIALOG")
     windowFrame:SetToplevel(true)
@@ -379,6 +379,7 @@ function ns:CreateSettingsWindow()
     local function questCheck(x, y, key)
         return SettingsDialog.buildFlatCheckbox(windowFrame, x, y, function(checked)
             ns:InitializeDatabase()[key] = checked
+            if ns.UpdateQuestTracker then ns:UpdateQuestTracker() end
         end, 215)
     end
     windowFrame.chkQuestAccept = questCheck(20, -270, "questAutoAccept")
@@ -387,29 +388,33 @@ function ns:CreateSettingsWindow()
     windowFrame.chkQuestBest = questCheck(245, -293, "questMarkBest")
     windowFrame.chkQuestSkipItems = questCheck(20, -316, "questSkipItems")
     windowFrame.chkQuestAnnounce = questCheck(245, -316, "questPartyAnnounce")
+    windowFrame.chkQuestAutoShare = questCheck(20, -339, "questAutoShare")
+    windowFrame.chkQuestAutoShare.tipKey = "TIP_QUEST_AUTO_SHARE"
+    windowFrame.chkTrackerParty = questCheck(245, -339, "trackerPartyStatus")
+    windowFrame.chkTrackerParty.tipKey = "TIP_TRACKER_PARTY"
 
     -- Map and minimap marks
-    windowFrame.secMap = SettingsDialog.buildSectionHeader(windowFrame, -348)
-    windowFrame.chkQuestLogPins = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -372, function(checked)
+    windowFrame.secMap = SettingsDialog.buildSectionHeader(windowFrame, -371)
+    windowFrame.chkQuestLogPins = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -395, function(checked)
         ns:InitializeDatabase().questLogPins = checked
         SettingsDialog.syncMapOptionRows(windowFrame)
         refreshMapMarks()
     end)
     windowFrame.chkQuestLogPins.tipKey = "TIP_QUEST_LOG_PINS"
-    windowFrame.chkQuestLogPinsAll = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -395, function(checked)
+    windowFrame.chkQuestLogPinsAll = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -418, function(checked)
         ns:InitializeDatabase().questLogPinsAll = checked
         refreshMapMarks()
     end)
     windowFrame.chkQuestLogPinsAll.tipKey = "TIP_QUEST_LOG_PINS_ALL"
-    windowFrame.chkQuestObjectivePins = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -418, function(checked)
+    windowFrame.chkQuestObjectivePins = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -441, function(checked)
         ns:InitializeDatabase().questObjectivePins = checked
         refreshMapMarks()
     end)
     windowFrame.chkQuestObjectivePins.tipKey = "TIP_QUEST_OBJECTIVE_PINS"
 
     local mapNote = windowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    mapNote:SetPoint("TOPLEFT", windowFrame, "TOPLEFT", 22, -446)
-    mapNote:SetPoint("TOPRIGHT", windowFrame, "TOPRIGHT", -20, -446)
+    mapNote:SetPoint("TOPLEFT", windowFrame, "TOPLEFT", 22, -469)
+    mapNote:SetPoint("TOPRIGHT", windowFrame, "TOPRIGHT", -20, -469)
     mapNote:SetJustifyH("LEFT")
     mapNote:SetTextColor(unpack(STYLE.danger))
     mapNote:Hide()
@@ -494,6 +499,10 @@ function ns:RefreshSettingsUI()
         w.chkQuestSkipItems:SetChecked(savedDB.questSkipItems == true)
         SettingsDialog.setFittedLabel(w.chkQuestAnnounce, self:L("OPT_QUEST_ANNOUNCE"))
         w.chkQuestAnnounce:SetChecked(savedDB.questPartyAnnounce == true)
+        SettingsDialog.setFittedLabel(w.chkQuestAutoShare, self:L("OPT_QUEST_AUTO_SHARE"))
+        w.chkQuestAutoShare:SetChecked(savedDB.questAutoShare == true)
+        SettingsDialog.setFittedLabel(w.chkTrackerParty, self:L("OPT_TRACKER_PARTY"))
+        w.chkTrackerParty:SetChecked(savedDB.trackerPartyStatus ~= false)
 
         w.secMap.title:SetText(self:L("SECTION_MAP"))
         SettingsDialog.setFittedLabel(w.chkQuestLogPins, self:L("questLogPins"))
