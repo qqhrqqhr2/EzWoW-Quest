@@ -144,7 +144,7 @@ def progress(have, need, finished=False):
 # ---------------------------------------------------------------------------
 T = {
     "ko": {
-        "lead": "퀘스트 추적기, 자동 수락·완료, 파티 진행 알림, 지도와 미니맵의 퀘스트 목표·보고 위치 표시",
+        "lead": "퀘스트 추적기, 자동 수락·완료, 파티 진행 알림, 지도와 미니맵의 퀘스트 목표·보고 위치, 받을 수 있는 퀘스트(!) 표시",
         "zones": ["엘윈 숲", "서부 몰락지대"],
         "q": {
             "wolf": "늑대 무리 쫓아내기", "wolfObj": "굶주린 회색 늑대 처치",
@@ -156,37 +156,39 @@ T = {
             "necklace": "잃어버린 목걸이", "necklaceObj": "할머니의 목걸이",
             "letter": "집으로 보내는 편지",
         },
-        "npc": "경비대장 로웬",
+        "npc": "경비대장 로웬", "giver": "농부 알드릭",
+        "gq": ["방앗간에 보낼 밀", "대장간 연장 배달"],
         "mapTitle": "엘윈 숲",
         "me": "이끼발톱",
         "party": "파티",
         "notes": [
-            ("추적기 머리줄", "수행 중인 퀘스트 수/최대 수. 좌클릭: 목록 접기·펼치기, 우클릭: 설정창. 끌어서 이동, Ctrl + 휠로 크기 50~150%."),
+            ("추적기 머리줄", "수행 중인 퀘스트 수/최대 수. 좌클릭: 목록 접기·펼치기, 우클릭: 설정창. 끌어서 이동, Ctrl + 휠로 크기 50~150%. 마우스를 올리면 나오는 자물쇠 버튼으로 위치·크기를 잠급니다(잠기면 배경이 투명해지고 Ctrl + 끌기로만 이동)."),
             ("지역 헤더", "퀘스트를 지역별로 묶습니다. 클릭하면 그 지역을 접습니다."),
             ("퀘스트 아이템 버튼", "사용 아이템이 있는 퀘스트는 왼쪽 버튼을 눌러 바로 씁니다."),
-            ("퀘스트 줄", "[레벨]을 난이도 색으로(던전은 [16D], 정예는 [21+]처럼 표시), (완료)·(실패)를 바로 표시. 파티 중에는 줄 끝에 같은 퀘스트를 가진 파티원 수([2/2] 초록 = 모두, [1/2] 보라 = 일부, [0/2] 회색 = 없음)를 보여 주고, 마우스를 올리면 파티원별로 나옵니다. 좌클릭: 퀘스트 로그, Ctrl + 좌클릭: 집중 추적(▸), Shift + 좌클릭: 채팅 링크, Alt + 좌클릭: 파티에 공유, 우클릭: 목표 접기, Alt + 우클릭: 숨기기."),
+            ("퀘스트 줄", "[레벨]을 난이도 색으로(던전은 [16D], 정예는 [21+]처럼 표시), (완료)·(실패)를 바로 표시. 파티 중에는 줄 끝에 같은 퀘스트를 가진 파티원 수([2/2] 초록 = 모두, [1/2] 보라 = 일부, [0/2] 회색 = 없음)를 보여 주고, 마우스를 올리면 파티원별로 나옵니다. 좌클릭: 퀘스트 로그와 함께 가장 가까운 수행 위치로 길 안내, Ctrl + 좌클릭: 퀘스트 로그만, Shift + 좌클릭: 채팅 링크, Alt + 좌클릭: 파티에 공유, 우클릭: 목표 접기, Alt + 우클릭: 숨기기."),
             ("목표 진행 색", "아직 0이면 흰색, 진행할수록 주황 → 노랑 → 연두, 다 채우면 초록."),
             ("크기 조절", "아래 모서리를 끌어 가로·세로 크기 조절(기본 270×360, 우클릭: 초기화). 목록이 길면 마우스 휠로 스크롤."),
-            ("목표 위치 (퀘스트마다 다른 색 점)", "처치할 몬스터와 모으거나 사용할 대상의 자리를 퀘스트마다 다른 색(빨강·파랑·초록·분홍·주황·하늘·보라·흰색 순)으로 표시합니다. 가까운 점은 같은 색 선으로 이어 사냥터 범위를 보여 줍니다. 마우스를 올리면 같은 색의 퀘스트 이름과 목표, 클릭하면 웨이포인트."),
+            ("목표 위치 (퀘스트마다 다른 색 점)", "처치할 몬스터와 모으거나 사용할 대상의 자리를 퀘스트마다 다른 색(빨강·파랑·초록·분홍·주황·하늘·보라·흰색 순)으로 표시합니다. 가까운 점은 같은 색 선으로 이어 사냥터 범위를 보여 줍니다. 목표가 분명하지 않은 퀘스트는 찾아볼 곳을 보여 줍니다. 마우스를 올리면 같은 색의 퀘스트 이름과 목표, 클릭하면 웨이포인트."),
             ("퀘스트 지역 (금색 고리)", "목표 위치 점이 없는 퀘스트(몬스터가 떨어뜨리는 아이템 등)는 게임이 알려 주는 퀘스트 지역을 속이 빈 금색 고리로 표시합니다."),
             ("보고 위치 (?)", "목표를 다 채운 퀘스트를 주거나 받는 NPC를 금색 테두리의 작은 어두운 원 안에 노란 ?로 표시합니다. 옵션을 켜면 진행 중인 퀘스트도 회색 ?로 표시합니다."),
             ("미니맵", "가까운 목표 점과 퀘스트 지역을 미니맵에도 표시합니다."),
             ("파티 진행 알림", "파티(인스턴스 그룹)에 수락 · 목표 진행 · 목표 달성 · 완료를 알립니다. 공격대에서는 보내지 않습니다."),
+            ("받을 수 있는 퀘스트 (!)", "지금 받을 수 있는 퀘스트가 있는 NPC를 노란 !로 표시합니다. 진영·직업·전문 기술·레벨이 맞고 앞 단계 퀘스트를 마친 퀘스트만 나오고, 명절·이벤트·기부·전장 퀘스트와 너무 낮은 레벨의 퀘스트는 빠집니다. 마우스를 올리면 퀘스트 목록, 클릭하면 웨이포인트. NPC와 미니맵 툴팁에도 받을 퀘스트와 보고할 퀘스트가 나옵니다."),
         ],
         "foot": "애드온 코드의 창 크기·좌표·색상·문구로 재현한 예시 화면입니다. 지도·미니맵·아이콘은 단순화한 그림이고, 퀘스트·NPC·캐릭터 이름은 지어낸 예시입니다. 지도 표시에는 EzWoW - Map Finder가 필요합니다.",
         "sTitle": "설정창",
         "sLead": "/ezq · /퀘스트 · 추적기, 퀘스트 자동화, 지도·미니맵 표시",
         "sNotes": [
             ("언어", "자동 또는 8개 언어 중 선택."),
-            ("퀘스트 추적 목록", "EzWoW 추적기 사용(끄면 게임 기본 추적창), 기본 추적창 숨기기, 모든 퀘스트 자동 표시, 지역 헤더·[레벨] 난이도 색, 반투명 배경. 추적기를 끄면 아래 항목은 흐려집니다."),
+            ("퀘스트 추적 목록", "EzWoW 추적기 사용(끄면 게임 기본 추적창), 기본 추적창 숨기기, 모든 퀘스트 자동 표시, 지역 헤더·[레벨] 난이도 색, 배경·테두리(끄면 글자만 보이는 투명 모드). 추적기를 끄면 아래 항목은 흐려집니다."),
             ("퀘스트 자동화", "자동 수락(Shift를 누르고 대화하면 건너뜀)·자동 완료는 처음에 꺼져 있습니다. 반복·회색 퀘스트 제외, 아이템을 내는 퀘스트 제외, 판매가가 가장 높은 보상 표시, 파티 진행 알림, 수락한 퀘스트를 파티에 공유(처음에는 꺼짐), 추적기에 파티원의 퀘스트 보유 표시."),
-            ("지도·미니맵 표시", "완료한 퀘스트의 보고 위치(노란 ?), 진행 중인 퀘스트 위치(회색 ?, 처음에는 꺼짐), 목표 위치 점. EzWoW - Map Finder가 없으면 이 항목은 흐려지고 빨간 안내 문구가 나옵니다."),
+            ("지도·미니맵 표시", "완료한 퀘스트의 보고 위치(노란 ?), 진행 중인 퀘스트 위치(회색 ?, 처음에는 꺼짐), 목표 위치 점, 받을 수 있는 퀘스트를 주는 NPC(노란 !). EzWoW - Map Finder가 없으면 이 항목은 흐려지고 빨간 안내 문구가 나옵니다."),
             ("하단", "설정 기본값 복원(언어와 모아 둔 퀘스트 정보는 유지), 추적기 위치·크기 초기화."),
         ],
         "sFoot": "애드온 코드의 창 크기·좌표·색상·문구로 재현한 예시 화면입니다. 체크 상태는 기본값입니다(EzWoW - Map Finder가 함께 켜져 있을 때).",
     },
     "en": {
-        "lead": "Quest tracker, auto accept & turn-in, party progress messages, and quest objective & turn-in spots on the map and minimap",
+        "lead": "Quest tracker, auto accept & turn-in, party progress messages, and objective, turn-in and quest giver (!) spots on the map and minimap",
         "zones": ["Elwynn Forest", "Westfall"],
         "q": {
             "wolf": "Driving Off the Wolf Pack", "wolfObj": "Hungry Grey Wolf slain",
@@ -198,31 +200,33 @@ T = {
             "necklace": "The Lost Necklace", "necklaceObj": "Grandmother's Necklace",
             "letter": "A Letter Home",
         },
-        "npc": "Guard Captain Rowen",
+        "npc": "Guard Captain Rowen", "giver": "Farmer Aldric",
+        "gq": ["Wheat for the Mill", "Tools for the Smithy"],
         "mapTitle": "Elwynn Forest",
         "me": "Mossclaw",
         "party": "Party",
         "notes": [
-            ("Tracker header", "Active quests / maximum. Left-click: collapse or expand, right-click: settings. Drag to move, Ctrl + wheel scales it 50–150%."),
+            ("Tracker header", "Active quests / maximum. Left-click: collapse or expand, right-click: settings. Drag to move, Ctrl + wheel scales it 50–150%. The lock button that appears on hover locks position and size (locked: see-through background, moves only with Ctrl + drag)."),
             ("Zone header", "Quests are grouped by zone. Click a zone to collapse it."),
             ("Quest item button", "Quests with a usable item get a button on the left; click it to use the item."),
-            ("Quest line", "[Lv] in difficulty colour (dungeons read [16D], elite quests [21+]), (Complete) and (Failed) at once. In a party the line ends with how many members also have the quest ([2/2] green = all, [1/2] violet = some, [0/2] grey = none); hover to see each member. Left-click: quest log, Ctrl + left-click: focus (▸), Shift + left-click: chat link, Alt + left-click: share with party, right-click: fold objectives, Alt + right-click: hide."),
+            ("Quest line", "[Lv] in difficulty colour (dungeons read [16D], elite quests [21+]), (Complete) and (Failed) at once. In a party the line ends with how many members also have the quest ([2/2] green = all, [1/2] violet = some, [0/2] grey = none); hover to see each member. Left-click: quest log plus a guide to the nearest place to go, Ctrl + left-click: quest log only, Shift + left-click: chat link, Alt + left-click: share with party, right-click: fold objectives, Alt + right-click: hide."),
             ("Objective colours", "White at 0, then orange → yellow → light green as you progress, green when done."),
             ("Resize", "Drag the bottom corner to resize (default 270×360, right-click: reset). Long lists scroll with the mouse wheel."),
-            ("Objective dots (one colour per quest)", "Where the creatures to kill and the things to collect or use are, in one colour per quest (red, blue, green, pink, orange, cyan, violet, white in turn). Nearby dots are joined by thin lines of the same colour so a hunting ground reads as one area. Hover for the quest name in that colour and its objectives, click for a waypoint."),
+            ("Objective dots (one colour per quest)", "Where the creatures to kill and the things to collect or use are, in one colour per quest (red, blue, green, pink, orange, cyan, violet, white in turn). Nearby dots are joined by thin lines of the same colour so a hunting ground reads as one area. Quests with unclear objectives show places to search. Hover for the quest name in that colour and its objectives, click for a waypoint."),
             ("Quest area (gold ring)", "Quests without objective dots (such as items dropped by creatures) get a hollow gold ring at the game's own quest area."),
             ("Turn-in spots (?)", "The quest giver or turn-in NPC of quests whose objectives are done: a yellow ? in a small dark badge with a gold rim. An option also shows quests in progress with a grey ?."),
             ("Minimap", "Nearby objective dots and quest areas show on the minimap too."),
             ("Party progress messages", "Tells your party (or instance group) when you accept a quest, make progress, finish the objectives and turn it in. Never sent in a raid."),
+            ("Quests you can take (!)", "NPCs with a quest you can take now get a yellow !. Only quests that match your side, class, profession and level, with earlier quests in the chain done; holiday, event, donation, battleground and low-level quests are left out. Hover for the quests, click for a waypoint. NPC and minimap tooltips also list quests to take and to hand in."),
         ],
         "foot": "Mock-up rebuilt from the window sizes, coordinates, colours and strings in the addon code. The map, minimap and icons are simplified drawings; quests, NPCs and character names are made up. Map marks need EzWoW - Map Finder.",
         "sTitle": "Settings",
         "sLead": "/ezq · tracker, quest automation, map & minimap marks",
         "sNotes": [
             ("Language", "Auto or one of 8 languages."),
-            ("Quest tracker", "Use the EzWoW tracker (off = game default tracker), hide the default tracker, show all active quests, zone headers and difficulty-coloured [Lv], translucent background. The options below dim while the tracker is off."),
+            ("Quest tracker", "Use the EzWoW tracker (off = game default tracker), hide the default tracker, show all active quests, zone headers and difficulty-coloured [Lv], background and frame (off = see-through, text only). The options below dim while the tracker is off."),
             ("Quest automation", "Auto accept (hold Shift while talking to skip) and auto turn-in start off. Skip repeatable and grey quests, skip quests that take items, mark the reward that sells for most, party progress messages, share accepted quests with the party (off by default), party members' quests in the tracker."),
-            ("Map & minimap marks", "Turn-in spots of finished quests (yellow ?), spots of quests in progress (grey ?, off by default), objective dots. Without EzWoW - Map Finder these options dim and a red note appears."),
+            ("Map & minimap marks", "Turn-in spots of finished quests (yellow ?), spots of quests in progress (grey ?, off by default), objective dots, NPCs with quests you can take (yellow !). Without EzWoW - Map Finder these options dim and a red note appears."),
             ("Bottom", "Restore defaults (keeps the language and the learned quest data), reset the tracker position and size."),
         ],
         "sFoot": "Mock-up rebuilt from the window size, coordinates, colours and strings in the addon code. Check boxes show the defaults (with EzWoW - Map Finder enabled).",
@@ -415,8 +419,9 @@ def tracker(ctx, lang, ox, oy):
 WOLVES_A = [(120, 70), (165, 52), (205, 88), (150, 112), (232, 132), (98, 125), (190, 160), (262, 84), (70, 88)]
 WOLVES_B = [(70, 300), (112, 322), (56, 345), (100, 362)]
 CRATES = [(318, 286), (366, 272), (412, 302), (384, 346), (334, 350), (431, 362)]
-RING = (575, 335)
-TURNIN = (784, 118)
+RING = (640, 382)
+TURNIN = (800, 196)
+GIVERS = [(600, 40), (250, 236)]  # NPCs with a quest to take now; the first one shows its tooltip
 
 
 def nets(points, radius, neighbours=2):
@@ -453,6 +458,13 @@ def turnin_badge(x, y, ready=True):
               f'color:{q};text-shadow:0 0 2px #000,1px 1px 0 #000">?</div>')
 
 
+def giver_badge(x, y):
+    """Quest giver mark (QuestLogPins.obtainGiverPin, state "now"): gold rim 16, dark disc 14, yellow "!" icon 12."""
+    return (disc(x, y, 16 * DS, "rgb(242,217,115)", .95) + disc(x, y, 14 * DS, "rgb(20,15,10)", .92)
+            + f'<div class="t" style="left:{x}px;top:{y + 0.5 * DS:.2f}px;transform:translate(-50%,-50%);font-size:{14 * DS:.0f}px;font-weight:800;'
+              f'color:#ffd200;text-shadow:0 0 2px #000,1px 1px 0 #000">!</div>')
+
+
 DS = 1.6  # marks keep their screen size; drawn at the same scale as the tracker
 
 
@@ -481,11 +493,11 @@ def map_panel(ctx, lang, x0, y0, w, h):
                '<stop offset="1" stop-color="#4c5b31"/></radialGradient></defs>'
                f'<rect width="{w}" height="{ch}" fill="url(#gr)"/>'
                '<path d="M0 0 H330 Q300 60 340 120 Q290 200 200 210 Q90 230 0 200 Z" fill="#41532c" opacity=".75"/>'
-               '<path d="M0 260 Q80 240 160 270 Q210 330 180 400 H0 Z" fill="#3e4f2a" opacity=".8"/>'
-               '<path d="M610 400 Q600 330 660 290 Q740 245 830 255 Q880 258 910 240 V400 Z" fill="#4f7f9a"/>'
-               '<path d="M620 400 Q615 335 670 300 Q745 258 835 266 Q882 268 910 252" fill="none" stroke="#c9b98a" stroke-width="4" opacity=".55"/>'
+               f'<path d="M0 260 Q80 240 160 270 Q210 330 180 {ch} H0 Z" fill="#3e4f2a" opacity=".8"/>'
+               f'<path d="M680 {ch} Q690 390 720 340 Q770 290 840 300 Q880 302 910 290 V{ch} Z" fill="#4f7f9a"/>'
+               f'<path d="M690 {ch} Q700 395 728 348 Q775 302 842 311 Q882 312 910 302" fill="none" stroke="#c9b98a" stroke-width="4" opacity=".55"/>'
                '<path d="M0 215 Q200 210 360 200 Q560 185 700 140 Q760 120 910 92" fill="none" stroke="#a88f5f" stroke-width="9" stroke-linecap="round"/>'
-               '<path d="M520 186 Q545 300 515 400" fill="none" stroke="#a88f5f" stroke-width="7"/>'
+               f'<path d="M520 186 Q545 300 515 {ch}" fill="none" stroke="#a88f5f" stroke-width="7"/>'
                '<g fill="#8d8478" stroke="#3a352e" stroke-width="2">'
                '<rect x="730" y="84" width="22" height="18"/><rect x="796" y="76" width="26" height="20"/>'
                '<rect x="742" y="142" width="24" height="18"/><rect x="826" y="140" width="20" height="16"/></g>'
@@ -510,6 +522,9 @@ def map_panel(ctx, lang, x0, y0, w, h):
     # turn-in badge
     qx, qy = TURNIN
     p.append(turnin_badge(qx, qy + TB))
+    # quest givers with a quest this character can take now
+    for gx, gy in GIVERS:
+        p.append(giver_badge(gx, gy + TB))
     # tooltip on a wolf dot (showGroupTooltip): title in the quest's dot colour
     hx, hy = WOLVES_A[7]
     tip1 = (f'<div style="color:{qc["wolf"]};font-size:15px">[8] {esc(q["wolf"])}</div>'
@@ -524,19 +539,27 @@ def map_panel(ctx, lang, x0, y0, w, h):
             f'<div style="color:#a7b9c5">{esc(L["questObjArea"])}</div>'
             f'<div style="color:#a7b9c5">{esc(L["questObjHint"])}</div>'
             f'<div style="color:#a7b9c5">EzWoW - Quest</div>')
-    p.append(f'<div class="tip" style="left:{rx + 16}px;top:{ry + TB - 65}px">{tip3}</div>')
+    p.append(f'<div class="tip" style="left:{rx + 16}px;top:{ry + TB - 48}px">{tip3}</div>')
     # tooltip on the turn-in mark (QuestLogPins)
     tip2 = (f'<div style="color:#7aa2f7;font-size:15px">{esc(t["npc"])}</div>'
             f'<div style="color:#edf4f7">[7] {esc(q["mine"])}&nbsp;&nbsp;<span style="color:#40ff59">{esc(L["questPinReady"])}</span></div>'
             f'<div style="color:#a7b9c5">{esc(L["questPinHint"])}</div>'
             f'<div style="color:#a7b9c5">EzWoW - Quest</div>')
     p.append(f'<div class="tip" style="right:{w - qx + 14}px;top:{qy + TB + 18}px">{tip2}</div>')
+    # tooltip on a quest giver: NPC name, the quests to take now in yellow ("! [Lv] name")
+    gx, gy = GIVERS[0]
+    tip4 = (f'<div style="color:#7aa2f7;font-size:15px">{esc(t["giver"])}</div>'
+            + "".join(f'<div style="color:#ffd100">! [{lv}] {esc(name)}</div>' for lv, name in zip((10, 11), t["gq"]))
+            + f'<div style="color:#a7b9c5">{esc(L["questGiverHint"])}</div>'
+            f'<div style="color:#a7b9c5">EzWoW - Quest</div>')
+    p.append(f'<div class="tip" style="left:{gx + 16}px;top:{gy + TB - 14}px">{tip4}</div>')
     html_ = (f'<div class="abs" style="left:{x0}px;top:{y0}px;width:{w}px;height:{h}px;border:2px solid #5d6d7a;border-radius:6px;'
              f'overflow:hidden;background:#0e1418">' + "".join(p) + "</div>")
     anchors = {
         "dots": (x0 + 30, y0 + TB + 40),
         "ring": (x0 + RING[0] - 30, y0 + TB + RING[1]),
         "turnin": (x0 + qx + 40, y0 + TB + qy),
+        "giver": (x0 + GIVERS[1][0] - 34, y0 + TB + GIVERS[1][1]),
     }
     return html_, anchors
 
@@ -589,11 +612,11 @@ def ui_page(lang, ctx):
     parts = []
     tr_html, ta, (tw, th) = tracker(ctx, lang, ox, oy)
     parts.append(tr_html)
-    mx, my, mw, mh = 640, oy, 910, 430
+    mx, my, mw, mh = 640, oy, 910, 500
     m_html, ma = map_panel(ctx, lang, mx, my, mw, mh)
     parts.append(m_html)
     sy = my + mh + 24
-    sh = round(oy + th * S - sy)
+    sh = 170
     s_html, sa = scene(ctx, lang, mx, sy, mw, sh)
     parts.append(s_html)
 
@@ -610,11 +633,12 @@ def ui_page(lang, ctx):
         (P(tw, 0)[0] + 30, P(0, th - 8)[1]),       # 6 resize corner
         ma["dots"], ma["ring"], ma["turnin"],       # 7 8 9
         sa["minimap"], sa["chat"],                 # 10 11
+        ma["giver"],                               # 12
     ]
     for i, (x, y) in enumerate(calls, 1):
         parts.append(f'<div class="call" style="left:{x - 15:.0f}px;top:{y - 15:.0f}px">{i}</div>')
 
-    notes_top = oy + th * S + 40
+    notes_top = max(oy + th * S, sy + sh) + 40
     half = 6
 
     def note_html(start, lst):
