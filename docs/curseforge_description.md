@@ -21,7 +21,7 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker that
 - Replaces the default objective tracker (can be switched back in the settings).
 - Quests grouped by zone, with difficulty-coloured `[Lv]` (dungeons read `[16D]`, elite quests `[21+]`) and `(Complete)` / `(Failed)` at once.
 - Objectives change colour as you progress: white → orange → yellow → green.
-- Newly accepted quests are marked "NEW" until you mouse over them.
+- Newly accepted quests are marked "NEW" until you click them.
 - Quests with a usable item get an item button you can click directly.
 - Drag to move, Ctrl + mouse wheel to scale (50–150%), drag the bottom corner to resize, mouse wheel to scroll.
 - A lock button on the header locks position and size (locked: see-through background, moves only with Ctrl + drag). The background and frame can also be turned off for a text-only list.
@@ -45,7 +45,7 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker that
 - **Objective dots, one colour per quest**: where the creatures to kill and the things to collect or use are. Nearby dots are joined by thin lines of the same colour, so a hunting ground reads as one area, and the quest name in the tooltip uses the same colour.
 - **Hollow gold ring**: the game's own quest area, for quests without objective dots.
 - **`?` badge**: where to turn in quests whose objectives are done, a yellow `?` in a small dark badge with a gold rim (grey `?` for quests in progress, optional).
-- Quests with unclear objectives show places to search, such as places named in the quest text.
+- Only objectives with a known location are shown; guessed spots are not.
 - Nearby dots also show on the minimap. Hover for the quest and objective, click to set a waypoint.
 
 ### Quests you can take (needs EzWoW - Map Finder)
@@ -87,7 +87,7 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 �
 - 기본 퀘스트 추적창 대신 사용합니다(설정에서 기본 추적창으로 되돌릴 수 있음).
 - 퀘스트를 지역별로 묶고 `[레벨]`을 난이도 색으로(던전은 `[16D]`, 정예는 `[21+]`처럼), `(완료)`·`(실패)`를 바로 표시합니다.
 - 목표 진행에 따라 색이 바뀝니다: 흰색 → 주황 → 노랑 → 초록.
-- 새로 받은 퀘스트 앞에 "NEW"가 붙고, 마우스를 올리면 사라집니다.
+- 새로 받은 퀘스트 앞에 "NEW"가 붙고, 클릭하면 사라집니다.
 - 사용 아이템이 있는 퀘스트는 아이템 버튼을 눌러 바로 씁니다.
 - 끌어서 이동, Ctrl + 마우스 휠로 크기(50~150%), 아래 모서리를 끌어 가로·세로 크기 조절, 마우스 휠로 스크롤.
 - 머리줄의 자물쇠 버튼으로 위치·크기를 잠급니다(잠기면 배경이 투명해지고 Ctrl + 끌기로만 이동). 배경·테두리를 꺼서 글자만 보이게 할 수도 있습니다.
@@ -111,7 +111,7 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 �
 - **퀘스트마다 다른 색의 목표 위치 점**: 처치할 몬스터와 모으거나 사용할 대상의 자리. 가까운 점은 같은 색 선으로 이어 사냥터 범위를 보여 주고, 툴팁의 퀘스트 이름도 같은 색으로 나옵니다.
 - **속이 빈 금색 고리**: 목표 위치 점이 없는 퀘스트의 퀘스트 지역(게임이 알려 주는 위치).
 - **`?` 표시**: 목표를 다 채운 퀘스트의 보고 위치. 금색 테두리의 작은 어두운 원 안에 노란 `?`(옵션을 켜면 진행 중인 퀘스트는 회색 `?`).
-- 목표가 분명하지 않은 퀘스트는 퀘스트 설명에 나온 곳 등 찾아볼 곳을 보여 줍니다.
+- 위치가 확실한 목표만 표시하고, 짐작한 위치는 표시하지 않습니다.
 - 가까운 점은 미니맵에도 표시합니다. 마우스를 올리면 퀘스트와 목표, 클릭하면 웨이포인트.
 
 ### 받을 수 있는 퀘스트 (EzWoW - Map Finder 필요)

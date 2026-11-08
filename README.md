@@ -49,9 +49,9 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 | ② | 지역 헤더 | 퀘스트를 지역별로 묶습니다. 클릭하면 그 지역을 접습니다 |
 | ③ | 퀘스트 아이템 버튼 | 사용 아이템이 있는 퀘스트는 왼쪽 버튼을 눌러 바로 씁니다 |
 | ④ | 퀘스트 줄 | `[레벨]`을 난이도 색으로(던전은 `[16D]`, 정예는 `[21+]`처럼 표시), `(완료)`·`(실패)`를 바로 표시합니다. 파티 중에는 줄 끝에 같은 퀘스트를 가진 파티원 수(`[2/2]` 초록 = 모두, `[1/2]` 보라 = 일부, `[0/2]` 회색 = 없음)를 보여 주고, 마우스를 올리면 파티원별로 나옵니다 |
-| ⑤ | 목표 진행 색 | 0이면 흰색, 진행할수록 주황 → 노랑 → 연두, 다 채우면 초록. 새로 받은 퀘스트는 앞에 "NEW"가 붙고 마우스를 올리면 사라집니다 |
+| ⑤ | 목표 진행 색 | 0이면 흰색, 진행할수록 주황 → 노랑 → 연두, 다 채우면 초록. 새로 받은 퀘스트는 앞에 "NEW"가 붙고 클릭하면 사라집니다 |
 | ⑥ | 크기 조절 | 아래 모서리를 끌어 가로·세로 크기 조절(기본 270×360) |
-| ⑦ | 목표 위치 (퀘스트마다 다른 색 점) | 처치할 몬스터와 모으거나 사용할 대상의 자리. 퀘스트마다 한 가지 색(빨강·파랑·초록·분홍·주황·하늘·보라·흰색 순)을 쓰고, 가까운 점은 같은 색 선으로 이어 사냥터 범위를 보여 줍니다. 툴팁의 퀘스트 이름도 같은 색입니다. 목표가 분명하지 않은 퀘스트는 찾아볼 곳(퀘스트 설명에 나온 곳 등)을 보여 줍니다 |
+| ⑦ | 목표 위치 (퀘스트마다 다른 색 점) | 처치할 몬스터와 모으거나 사용할 대상의 자리. 퀘스트마다 한 가지 색(빨강·파랑·초록·분홍·주황·하늘·보라·흰색 순)을 쓰고, 가까운 점은 같은 색 선으로 이어 사냥터 범위를 보여 줍니다. 툴팁의 퀘스트 이름도 같은 색입니다. 위치가 확실한 목표만 표시하고, 짐작한 위치는 표시하지 않습니다 |
 | ⑧ | 퀘스트 지역 (금색 고리) | 목표 위치 점이 없는 퀘스트(몬스터가 떨어뜨리는 아이템 등)는 게임이 알려 주는 퀘스트 지역을 속이 빈 금색 고리로 표시 |
 | ⑨ | 보고 위치 (`?`) | 목표를 다 채운 퀘스트를 주거나 받는 NPC. 금색 테두리의 작은 어두운 원 안에 노란 `?`. 옵션을 켜면 진행 중인 퀘스트도 회색 `?`로 표시 |
 | ⑩ | 미니맵 | 가까운 목표 점과 퀘스트 지역을 미니맵에도 표시 |
@@ -190,7 +190,7 @@ All quest features in one addon.
 | ④ | Quest line | `[Lv]` in difficulty colour (dungeons read `[16D]`, elite quests `[21+]`), `(Complete)` and `(Failed)` at once. In a party the line ends with how many members also have the quest (`[2/2]` green = all, `[1/2]` violet = some, `[0/2]` grey = none); hover to see each member |
 | ⑤ | Objective colours | White at 0, then orange → yellow → light green, green when done |
 | ⑥ | Resize | Drag the bottom corner to resize (default 270×360) |
-| ⑦ | Objective dots (one colour per quest) | Where the creatures to kill and the things to collect or use are. Each quest gets one colour (red, blue, green, pink, orange, cyan, violet, white in turn); nearby dots are joined by thin lines of the same colour so a hunting ground reads as one area. The quest name in the tooltip uses the same colour. Quests with unclear objectives show places to search (such as places named in the quest text) |
+| ⑦ | Objective dots (one colour per quest) | Where the creatures to kill and the things to collect or use are. Each quest gets one colour (red, blue, green, pink, orange, cyan, violet, white in turn); nearby dots are joined by thin lines of the same colour so a hunting ground reads as one area. The quest name in the tooltip uses the same colour. Only objectives with a known location are shown; guessed spots are not |
 | ⑧ | Quest area (gold ring) | Quests without objective dots (such as items dropped by creatures) get a hollow gold ring at the game's own quest area |
 | ⑨ | Turn-in spots (`?`) | Quest giver or turn-in NPC of quests whose objectives are done: a yellow `?` in a small dark badge with a gold rim. An option also shows quests in progress with a grey `?` |
 | ⑩ | Minimap | Nearby objective dots and quest areas show on the minimap too |

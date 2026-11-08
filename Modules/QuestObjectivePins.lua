@@ -766,15 +766,9 @@ function QuestObjectivePins.rebuildQuests()
                     if obj.type == "item" then
                         obj.itemKey = normalize(stripCounts(obj.text))
                         local learned = obj.itemKey and learnedDropEntries(obj.itemKey)
+                        -- no guessed spots (creatures named like the item): they were often wrong
                         if learned then
                             obj.entries = learned
-                        elseif not obj.entries and obj.itemKey then
-                            zones = zones or questZones()
-                            local zone = zones[q.id]
-                            local guessed = zone and entriesInZone(guessedDropEntries(obj.itemKey), zone)
-                            if guessed then
-                                obj.entries, obj.zoneOnly, obj.guess = guessed, zone, true
-                            end
                         end
                     end
                 end
@@ -788,7 +782,8 @@ function QuestObjectivePins.rebuildQuests()
             end
             if not pointed then
                 local learned = learnedMentions(q.id)
-                for _, extra in ipairs({ learned or {}, placeHints(q.id) or {}, mentionedObjectives(q.id) or {} }) do
+                -- names picked out of the quest text are not used: their spots were often wrong
+                for _, extra in ipairs({ learned or {}, placeHints(q.id) or {} }) do
                     for _, m in ipairs(extra) do quest.objectives[#quest.objectives + 1] = m end
                 end
             end
