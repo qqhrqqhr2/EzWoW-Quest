@@ -309,9 +309,32 @@ function QuestLogPins.spotsFor(entry, questID)
     return kept
 end
 
--- where a quest is turned in (nil when the data doesn't know the quest)
+-- Turn-in places from the learned / installed sources (Modules/QuestSources.lua):
+-- the spots, and spot key -> NPC or object name.
+local function sourceTurnIn(questID)
+    local sources = ns.QuestSources
+    if not (sources and sources.turnInEntries) then return nil end
+    local ok, entries = pcall(sources.turnInEntries, questID)
+    if not ok or type(entries) ~= "table" then return nil end
+    local spots, names = {}, {}
+    for _, e in ipairs(entries) do
+        local name = sources.nameOf and sources.nameOf(e)
+        for _, sp in ipairs(e.spawns or {}) do
+            spots[#spots + 1] = sp
+            local key = spotKey(sp)
+            if key and name then names[key] = name end
+        end
+    end
+    if #spots == 0 then return nil end
+    return spots, names
+end
+
+-- where a quest is turned in (nil when the data doesn't know the quest);
+-- second value: spot key -> name, for spots the built-in data has no NPC for
 function QuestLogPins.turnInSpotsForQuest(questID)
     QuestLogPins.buildIndexes()
+    local spots, names = sourceTurnIn(questID)
+    if spots then return spots, names end
     local entry = questIndex and questIndex[questID]
     if not (entry and entry.spawns) then return nil end
     return QuestLogPins.spotsFor(entry, questID)
@@ -466,13 +489,17 @@ function QuestLogPins.refresh()
     local showAll = ns.DB.questLogPinsAll == true
     local groups = {}
     for _, quest in ipairs(QuestLogPins.collectQuests()) do
-        local entry = (quest.complete or showAll) and questIndex[quest.id]
-        if entry and entry.spawns then
-            if not quest.title or quest.title == "" or isSecret(quest.title) then
+        local spots, spotNames
+        if quest.complete or showAll then
+            spots, spotNames = QuestLogPins.turnInSpotsForQuest(quest.id)
+        end
+        if spots then
+            local entry = questIndex[quest.id]
+            if (not quest.title or quest.title == "" or isSecret(quest.title)) and entry then
                 quest.title = ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(entry) or nil
             end
             local seenSpot = {}
-            for _, sp in ipairs(QuestLogPins.spotsFor(entry, quest.id)) do
+            for _, sp in ipairs(spots) do
                 local key = spotKey(sp) or tostring(sp)
                 if not seenSpot[key] then
                     seenSpot[key] = true
@@ -489,7 +516,8 @@ function QuestLogPins.refresh()
                         if not group then
                             local npc = npcBySpot[key]
                             group = { px = px, py = py, cw = cw, ch = ch, spawn = sp, quests = {}, ids = {},
-                                npcName = npc and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(npc) or nil }
+                                npcName = (npc and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(npc))
+                                    or (spotNames and spotNames[key]) or nil }
                             groups[#groups + 1] = group
                         end
                         if not group.ids[quest.id] then
@@ -958,7 +986,22 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
     buildNpcQuests()
     me = me or playerInfo()
     local found = {}
-    for questID in pairs(npcTakes[npcId] or {}) do
+    -- finished quests turned in here: the built-in data, plus the turn-in NPC
+    -- known from the learned / installed sources
+    local takes = {}
+    for questID in pairs(npcTakes[npcId] or {}) do takes[questID] = true end
+    local sources = ns.QuestSources
+    if sources and sources.turnInEntries then
+        for _, quest in ipairs(QuestLogPins.collectQuests()) do
+            if quest.complete and not takes[quest.id] then
+                local ok, entries = pcall(sources.turnInEntries, quest.id)
+                for _, e in ipairs(ok and type(entries) == "table" and entries or {}) do
+                    if e.kind == "npc" and e.id == npcId then takes[quest.id] = true break end
+                end
+            end
+        end
+    end
+    for questID in pairs(takes) do
         if questInLog(questID) and QuestLogPins.isQuestComplete(questID) then
             found[#found + 1] = { order = 0, level = 0, text = "? " .. questName(questID) .. " |cff8fd19e(" .. ns:L("NPC_TT_TURNIN") .. ")|r",
                 r = 0.25, g = 1, b = 0.35 }

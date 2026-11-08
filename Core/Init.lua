@@ -57,6 +57,13 @@ ns.DEFAULTS = {
     -- learned data
     questDropSources = {},
     questStarters = {},
+    questEnders = {},
+    questEventSpots = {},
+    questDropItems = {},
+    -- sharing learned spots with other players of this addon
+    questShareData = true,
+    questShareChannel = true,
+    questShareInbox = {},
 }
 
 -- Settings carried over once from the addons that had the quest features before.

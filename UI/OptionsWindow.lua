@@ -259,7 +259,7 @@ function ns:CreateSettingsWindow()
     if settingsFrame then return settingsFrame end
 
     local windowFrame = CreateFrame("Frame", SETTINGS_NAME, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    windowFrame:SetSize(480, 560)
+    windowFrame:SetSize(480, 583)
     windowFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     windowFrame:SetFrameStrata("FULLSCREEN_DIALOG")
     windowFrame:SetToplevel(true)
@@ -416,10 +416,15 @@ function ns:CreateSettingsWindow()
         refreshMapMarks()
     end)
     windowFrame.chkQuestGiverPins.tipKey = "TIP_QUEST_GIVER_PINS"
+    windowFrame.chkQuestShareData = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -487, function(checked)
+        ns:InitializeDatabase().questShareData = checked
+        if ns.DataShare and ns.DataShare.setEnabled then pcall(ns.DataShare.setEnabled) end
+    end)
+    windowFrame.chkQuestShareData.tipKey = "TIP_QUEST_SHARE_DATA"
 
     local mapNote = windowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    mapNote:SetPoint("TOPLEFT", windowFrame, "TOPLEFT", 22, -492)
-    mapNote:SetPoint("TOPRIGHT", windowFrame, "TOPRIGHT", -20, -492)
+    mapNote:SetPoint("TOPLEFT", windowFrame, "TOPLEFT", 22, -515)
+    mapNote:SetPoint("TOPRIGHT", windowFrame, "TOPRIGHT", -20, -515)
     mapNote:SetJustifyH("LEFT")
     mapNote:SetTextColor(unpack(STYLE.danger))
     mapNote:Hide()
@@ -518,6 +523,8 @@ function ns:RefreshSettingsUI()
         w.chkQuestObjectivePins:SetChecked(savedDB.questObjectivePins ~= false)
         SettingsDialog.setFittedLabel(w.chkQuestGiverPins, self:L("questGiverPins"))
         w.chkQuestGiverPins:SetChecked(savedDB.questGiverPins ~= false)
+        SettingsDialog.setFittedLabel(w.chkQuestShareData, self:L("questShareData"))
+        w.chkQuestShareData:SetChecked(savedDB.questShareData ~= false)
         w.mapNote:SetText(self:L("MAP_NEEDS_MAPFINDER"))
         SettingsDialog.syncMapOptionRows(w)
 
@@ -535,7 +542,7 @@ function ns:RefreshSettingsUI()
 end
 
 -- Every setting back to its default; learned quest data is kept.
-local KEEP_ON_RESET = { questDropSources = true, questStarters = true, lang = true }
+local KEEP_ON_RESET = { questDropSources = true, questStarters = true, questEnders = true, questEventSpots = true, questDropItems = true, lang = true }
 
 function ns:ResetToDefaults()
     local savedDB = self:InitializeDatabase()

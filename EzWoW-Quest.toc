@@ -35,6 +35,8 @@ UI\LanguageDropdown.lua
 Modules\QuestAutomation.lua
 Modules\QuestAnnounce.lua
 Modules\QuestShare.lua
+Modules\QuestSources.lua
+Modules\DataShare.lua
 Modules\QuestLogPins.lua
 Modules\QuestObjectivePins.lua
 UI\QuestTracker.lua
