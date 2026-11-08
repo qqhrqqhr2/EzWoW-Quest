@@ -1170,7 +1170,7 @@ function ObjectiveTrackerController.schedulePartyRefresh()
     end)
 end
 
--- Newly accepted quests get a "NEW" mark until the quest line is clicked.
+-- Newly accepted quests get a "NEW" mark until the mouse goes over them.
 -- Kept per character (the saved data is shared by all characters).
 function ObjectiveTrackerController.newQuestSet(create)
     local savedDB = ns:InitializeDatabase()
@@ -1244,6 +1244,11 @@ function ObjectiveTrackerController.acquireTrackerRowWidget(index)
 
     line:SetScript("OnEnter", function(self)
         self.hl:Show()
+        local hovered = self.questData and self.questData.questID
+        if hovered and ObjectiveTrackerController.isQuestNew(hovered) then
+            ObjectiveTrackerController.markQuestNew(hovered, false)
+            ns:ScheduleTrackerUpdate()
+        end
         if self.questData and GameTooltip then
             local priorityQueue = self.questData
             local cxVal = self:GetCenter() or 0
@@ -1972,11 +1977,6 @@ function ns:UpdateQuestTracker()
                     qLine:SetSize(math.max(90, innerWidth - 8 - itemIndent), qhVal)
 
                     local function onQuestOrObjClick(_, button)
-                        -- a click on the quest (any button) clears its "NEW" mark
-                        if ObjectiveTrackerController.isQuestNew(priorityQueue.questID) then
-                            ObjectiveTrackerController.markQuestNew(priorityQueue.questID, false)
-                            ns:ScheduleTrackerUpdate()
-                        end
                         if ObjectiveTrackerController.handleQuickResetClick(button) then return end
                         if button == "LeftButton" then
                             if IsShiftKeyDown and IsShiftKeyDown() then

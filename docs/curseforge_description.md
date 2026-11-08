@@ -21,7 +21,7 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker that
 - Replaces the default objective tracker (can be switched back in the settings).
 - Quests grouped by zone, with difficulty-coloured `[Lv]` (dungeons read `[16D]`, elite quests `[21+]`) and `(Complete)` / `(Failed)` at once.
 - Objectives change colour as you progress: white → orange → yellow → green.
-- Newly accepted quests are marked "NEW" until you click them.
+- Newly accepted quests are marked "NEW" until you mouse over them.
 - Quests with a usable item get an item button you can click directly.
 - Drag to move, Ctrl + mouse wheel to scale (50–150%), drag the bottom corner to resize, mouse wheel to scroll.
 - A lock button on the header locks position and size (locked: see-through background, moves only with Ctrl + drag). The background and frame can also be turned off for a text-only list.
@@ -87,7 +87,7 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 �
 - 기본 퀘스트 추적창 대신 사용합니다(설정에서 기본 추적창으로 되돌릴 수 있음).
 - 퀘스트를 지역별로 묶고 `[레벨]`을 난이도 색으로(던전은 `[16D]`, 정예는 `[21+]`처럼), `(완료)`·`(실패)`를 바로 표시합니다.
 - 목표 진행에 따라 색이 바뀝니다: 흰색 → 주황 → 노랑 → 초록.
-- 새로 받은 퀘스트 앞에 "NEW"가 붙고, 클릭하면 사라집니다.
+- 새로 받은 퀘스트 앞에 "NEW"가 붙고, 마우스를 올리면 사라집니다.
 - 사용 아이템이 있는 퀘스트는 아이템 버튼을 눌러 바로 씁니다.
 - 끌어서 이동, Ctrl + 마우스 휠로 크기(50~150%), 아래 모서리를 끌어 가로·세로 크기 조절, 마우스 휠로 스크롤.
 - 머리줄의 자물쇠 버튼으로 위치·크기를 잠급니다(잠기면 배경이 투명해지고 Ctrl + 끌기로만 이동). 배경·테두리를 꺼서 글자만 보이게 할 수도 있습니다.

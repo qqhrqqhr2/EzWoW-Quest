@@ -243,6 +243,25 @@ local function starterStore()
     return ns.DB.questStarters
 end
 
+-- Quests this character has handed in, kept per character (the saved data is
+-- shared by all characters). One handed in that the game still does not flag
+-- as completed is repeatable: it is shown with a blue "?" (see repeatDone).
+local function turnedInSet(create)
+    if not ns.DB then return nil end
+    local guid = UnitGUID and UnitGUID("player")
+    if type(guid) ~= "string" or isSecret(guid) then return nil end
+    if type(ns.DB.questTurnedIn) ~= "table" then
+        if not create then return nil end
+        ns.DB.questTurnedIn = {}
+    end
+    local set = ns.DB.questTurnedIn[guid]
+    if not set and create then
+        set = {}
+        ns.DB.questTurnedIn[guid] = set
+    end
+    return set
+end
+
 local function guidToStarter(guid)
     if type(guid) ~= "string" or isSecret(guid) then return nil end
     local unitType, _, _, _, _, id = strsplit("-", guid)
@@ -577,6 +596,8 @@ local function onQuestEvent(event, ...)
         local questID = tonumber((...))
         local store = starterStore()
         if store and questID and not isSecret(questID) then store[questID] = nil end
+        local turned = questID and not isSecret(questID) and turnedInSet(true)
+        if turned then turned[questID] = true end
     end
     return false
 end
@@ -725,6 +746,13 @@ local function questDone(questID)
     local ok, done = pcall(C_QuestLog.IsQuestFlaggedCompleted, questID)
     return ok and done == true
 end
+
+-- a repeatable quest this character has done before
+local function repeatDone(questID)
+    local set = turnedInSet(false)
+    return set ~= nil and set[questID] == true and not questDone(questID)
+end
+QuestLogPins.repeatDone = repeatDone
 
 local function questInLog(questID)
     if not (C_QuestLog and C_QuestLog.GetLogIndexForQuestID) then return false end
@@ -949,14 +977,19 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
             local tooHigh = (q.min or 0) > me.level
             local known = level > 0
             local prefix = known and ("[" .. level .. "] ") or ""
-            local text = "! " .. prefix .. name
+            local again = repeatDone(questID)
+            local text = (again and "? " or "! ") .. prefix .. name
             if tooHigh then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_LEVEL"), q.min) .. ")" end
             if not sameName[text] then
                 sameName[text] = true
                 -- yellow: can take now · pale yellow: level not known · grey: later
+                -- · blue: a repeatable quest done before
+                local r = tooHigh and 0.6 or known and 1 or 0.85
+                local g = tooHigh and 0.6 or known and 0.82 or 0.78
+                local b = tooHigh and 0.6 or known and 0 or 0.5
+                if again and not tooHigh then r, g, b = 0.35, 0.7, 1 end
                 found[#found + 1] = { order = tooHigh and 3 or known and 1 or 2, level = level, text = text,
-                    r = tooHigh and 0.6 or known and 1 or 0.85, g = tooHigh and 0.6 or known and 0.82 or 0.78,
-                    b = tooHigh and 0.6 or known and 0 or 0.5 }
+                    r = r, g = g, b = b }
             end
         end
     end
@@ -1013,7 +1046,8 @@ QuestLogPins.trivialFloor = trivialBelow
 -- The map shows only quests the character can surely take now: level known,
 -- reachable, and not grey. Quests without a level in the data stay off the
 -- map (they are still listed on the NPC's own tooltip).
-local STATE_RANK = { now = 3, unknown = 2, soon = 1 }
+-- repeat: every quest it has now is a repeatable one done before (blue "?")
+local STATE_RANK = { now = 3, ["repeat"] = 2.5, unknown = 2, soon = 1 }
 
 local function takeNow(q, me, floorLevel)
     local lvl = q and tonumber(q.lvl)
@@ -1023,10 +1057,14 @@ QuestLogPins.takeNow = takeNow
 
 local function giverState(npcId, me)
     local floorLevel = trivialBelow(me.level)
+    local state
     for questID in pairs(npcGives[npcId] or {}) do
-        if takeNow(takeable(questID, me), me, floorLevel) then return "now" end
+        if takeNow(takeable(questID, me), me, floorLevel) then
+            if not repeatDone(questID) then return "now" end
+            state = "repeat"
+        end
     end
-    return nil
+    return state
 end
 
 local function obtainGiverPin(index)
@@ -1126,13 +1164,25 @@ function QuestLogPins.refreshGivers(mapID, project, canvasFrame, cw, ch, cScale)
     for index, group in ipairs(groups) do
         local pin = obtainGiverPin(index)
         local now, unknown = group.state == "now", group.state == "unknown"
+        local again = group.state == "repeat"
         pin:SetParent(canvasFrame)
-        pin:SetFrameLevel((canvasFrame:GetFrameLevel() or 10) + (now and 180 or unknown and 175 or 170))
+        pin:SetFrameLevel((canvasFrame:GetFrameLevel() or 10) + (now and 180 or again and 178 or unknown and 175 or 170))
         pin.group = group
-        -- yellow: can take now · faint yellow: level not known · grey: a few levels later
-        pin.icon:SetDesaturated(not (now or unknown))
-        pin.icon:SetAlpha(now and 1 or unknown and 0.55 or 0.75)
-        pin.rim:SetVertexColor(now and 0.95 or 0.6, now and 0.85 or 0.6, now and 0.45 or 0.6, now and 0.95 or 0.6)
+        if again then
+            -- blue "?": only repeatable quests done before
+            pin.icon:SetTexture(ICON_READY)
+            pin.icon:SetDesaturated(true)
+            pin.icon:SetVertexColor(0.35, 0.7, 1)
+            pin.icon:SetAlpha(1)
+            pin.rim:SetVertexColor(0.35, 0.65, 1, 0.95)
+        else
+            -- yellow: can take now · faint yellow: level not known · grey: a few levels later
+            pin.icon:SetTexture(ICON_GIVER)
+            pin.icon:SetVertexColor(1, 1, 1)
+            pin.icon:SetDesaturated(not (now or unknown))
+            pin.icon:SetAlpha(now and 1 or unknown and 0.55 or 0.75)
+            pin.rim:SetVertexColor(now and 0.95 or 0.6, now and 0.85 or 0.6, now and 0.45 or 0.6, now and 0.95 or 0.6)
+        end
         QuestLogPins.anchorPin(pin, canvasFrame, cw, ch, cScale)
         pin:Show()
     end
