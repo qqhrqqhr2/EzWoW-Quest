@@ -558,6 +558,7 @@ function ObjectiveTrackerController.gatherWatchedQuestRecords()
                     hiddenQuests[qID] = nil
                     watchedQuests[qID] = nil
                     if savedDB.trackerCollapsedQuests then savedDB.trackerCollapsedQuests[qID] = nil end
+                    ObjectiveTrackerController.markQuestNew(qID, false)
                 end
             end
         end
@@ -1169,6 +1170,35 @@ function ObjectiveTrackerController.schedulePartyRefresh()
     end)
 end
 
+-- Newly accepted quests get a "NEW" mark until the mouse goes over them.
+-- Kept per character (the saved data is shared by all characters).
+function ObjectiveTrackerController.newQuestSet(create)
+    local savedDB = ns:InitializeDatabase()
+    local guid = UnitGUID and UnitGUID("player")
+    if type(guid) ~= "string" or (issecretvalue and issecretvalue(guid)) then return nil end
+    if type(savedDB.trackerNewQuests) ~= "table" then
+        if not create then return nil end
+        savedDB.trackerNewQuests = {}
+    end
+    local set = savedDB.trackerNewQuests[guid]
+    if not set and create then
+        set = {}
+        savedDB.trackerNewQuests[guid] = set
+    end
+    return set
+end
+
+function ObjectiveTrackerController.markQuestNew(questID, isNew)
+    local set = ObjectiveTrackerController.newQuestSet(isNew)
+    if not set then return end
+    set[questID] = isNew and true or nil
+end
+
+function ObjectiveTrackerController.isQuestNew(questID)
+    local set = ObjectiveTrackerController.newQuestSet(false)
+    return set and questID and set[questID] or false
+end
+
 function ObjectiveTrackerController.acquireTrackerRowWidget(index)
     local line = linePool[index]
     if line then
@@ -1214,6 +1244,11 @@ function ObjectiveTrackerController.acquireTrackerRowWidget(index)
 
     line:SetScript("OnEnter", function(self)
         self.hl:Show()
+        local hovered = self.questData and self.questData.questID
+        if hovered and ObjectiveTrackerController.isQuestNew(hovered) then
+            ObjectiveTrackerController.markQuestNew(hovered, false)
+            ns:ScheduleTrackerUpdate()
+        end
         if self.questData and GameTooltip then
             local priorityQueue = self.questData
             local cxVal = self:GetCenter() or 0
@@ -1935,7 +1970,8 @@ function ns:UpdateQuestTracker()
                     end
 
                     local partySuffix = ObjectiveTrackerController.resolvePartySuffix(priorityQueue)
-                    qLine.text:SetText(focusMark .. diffHex .. lvPrefix .. (priorityQueue.title or "") .. "|r" .. stateSuffix .. partySuffix)
+                    local newMark = ObjectiveTrackerController.isQuestNew(priorityQueue.questID) and "|cff4fd1ffNEW|r " or ""
+                    qLine.text:SetText(focusMark .. newMark .. diffHex .. lvPrefix .. (priorityQueue.title or "") .. "|r" .. stateSuffix .. partySuffix)
 
                     local qhVal = math.max(15, (qLine.text:GetStringHeight() or 13) + 2)
                     qLine:SetSize(math.max(90, innerWidth - 8 - itemIndent), qhVal)
@@ -2127,6 +2163,7 @@ trackerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
     elseif event == "QUEST_ACCEPTED" then
         local qID = tonumber(arg2) or tonumber(arg1)
         if qID and qID > 0 then
+            ObjectiveTrackerController.markQuestNew(qID, true)
             ObjectiveTrackerController.onUserWatchQuest(qID)
             return
         end
@@ -2137,6 +2174,7 @@ trackerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
             if savedDB.trackerHiddenQuests then savedDB.trackerHiddenQuests[qID] = nil end
             if savedDB.trackerWatchedQuests then savedDB.trackerWatchedQuests[qID] = nil end
             if savedDB.trackerCollapsedQuests then savedDB.trackerCollapsedQuests[qID] = nil end
+            ObjectiveTrackerController.markQuestNew(qID, false)
             questMetaCache[qID] = nil
             lastWatchedState[qID] = nil
         end
