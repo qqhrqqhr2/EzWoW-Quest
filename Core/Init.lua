@@ -51,6 +51,7 @@ ns.DEFAULTS = {
     -- map and minimap marks
     questLogPins = true,
     questLogPinsAll = false,
+    questGiverPins = true,
     questObjectivePins = true,
     questEngineRings = true,
     -- learned data

@@ -87,6 +87,8 @@ local lEnus = {
     questPinActive = "In progress",
     questPinHint = "Quest giver or turn-in spot · Click: set waypoint",
     questObjectivePins = "Show objective spots of quests in progress (map and minimap)",
+    questGiverPins = "Show quest givers with quests you can take (\"!\")",
+    questGiverHint = "Quest giver · Click: set waypoint",
     questObjHint = "Click: set waypoint",
     questObjArea = "Quest area",
     questObjGuess = "(likely: creatures named like the item)",
@@ -96,6 +98,7 @@ local lEnus = {
     questGuideNone = "%s: no known place to guide to",
     TIP_QUEST_LOG_PINS = "Marks with a question mark on the World Map where to turn in quests in your log whose objectives are done (the quest giver / turn-in NPC). Click a mark to set a waypoint.",
     TIP_QUEST_LOG_PINS_ALL = "Also shows the quest giver / turn-in spots of quests still in progress, with a grey question mark.",
+    TIP_QUEST_GIVER_PINS = "Puts a yellow \"!\" on the World Map over NPCs that have a quest you can take now: your side, class and level, with the quests before it done. Holiday, event, donation and battleground quests are left out. Mouse over for the quests; click sets a waypoint.",
     TIP_QUEST_OBJECTIVE_PINS = "Shows where the monsters and the things to collect or use of your unfinished quest objectives are, on the World Map and the minimap, as small dots in one colour per quest; nearby dots are joined by thin lines. Quests without such spots get a hollow gold ring at the game's quest area. Click a mark to set a waypoint.",
 }
 
@@ -180,6 +183,8 @@ local lKokr = {
     questPinActive = "진행 중",
     questPinHint = "퀘스트를 주거나 받는 곳 · 클릭: 웨이포인트 설정",
     questObjectivePins = "진행 중인 퀘스트 목표 위치 표시 (지도·미니맵)",
+    questGiverPins = "받을 수 있는 퀘스트 주는 NPC 표시 (!)",
+    questGiverHint = "퀘스트를 주는 곳 · 클릭: 웨이포인트 설정",
     questObjHint = "클릭: 웨이포인트 설정",
     questObjArea = "퀘스트 지역",
     questObjGuess = "(추정 위치: 아이템 이름이 들어간 몬스터)",
@@ -189,6 +194,7 @@ local lKokr = {
     questGuideNone = "%s: 안내할 위치를 찾지 못했습니다",
     TIP_QUEST_LOG_PINS = "퀘스트 목록에서 목표를 모두 채운 퀘스트의 보고 위치(퀘스트를 주거나 받는 NPC 위치)를 월드맵에 물음표로 표시합니다. 클릭하면 웨이포인트를 찍습니다.",
     TIP_QUEST_LOG_PINS_ALL = "아직 진행 중인 퀘스트도 퀘스트를 주거나 받는 위치를 회색 물음표로 함께 표시합니다.",
+    TIP_QUEST_GIVER_PINS = "세계지도에서 지금 받을 수 있는 퀘스트가 있는 NPC 위에 노란 \"!\"를 표시합니다. 진영·직업·레벨이 맞고 앞 단계 퀘스트를 마친 퀘스트만 나옵니다. 명절·이벤트·기부·전장 퀘스트는 빠집니다. 마우스를 올리면 퀘스트 목록이 나오고, 클릭하면 웨이포인트를 찍습니다.",
     TIP_QUEST_OBJECTIVE_PINS = "아직 다 채우지 않은 퀘스트 목표의 몬스터와 모으거나 사용할 대상의 위치를 월드맵과 미니맵에 퀘스트마다 다른 색의 작은 점으로 표시합니다. 가까운 점은 가는 선으로 이어 줍니다. 그런 위치가 없는 퀘스트는 게임이 알려 주는 퀘스트 지역에 속이 빈 금색 고리로 표시합니다. 클릭하면 웨이포인트를 찍습니다.",
 }
 
@@ -273,6 +279,8 @@ local lDede = {
     questPinActive = "In Arbeit",
     questPinHint = "Questgeber oder Abgabeort · Klick: Wegpunkt setzen",
     questObjectivePins = "Zielorte laufender Quests zeigen (Karte und Minikarte)",
+    questGiverPins = "Questgeber mit annehmbaren Quests zeigen (!)",
+    questGiverHint = "Questgeber · Klick: Wegpunkt setzen",
     questObjHint = "Klick: Wegpunkt setzen",
     questObjArea = "Questgebiet",
     questObjGuess = "(vermutet: Kreaturen mit ähnlichem Namen)",
@@ -282,6 +290,7 @@ local lDede = {
     questGuideNone = "%s: kein bekannter Ort",
     TIP_QUEST_LOG_PINS = "Markiert auf der Weltkarte mit einem Fragezeichen, wo fertige Quests aus deinem Log abgegeben werden. Klick setzt einen Wegpunkt.",
     TIP_QUEST_LOG_PINS_ALL = "Zeigt auch Questgeber und Abgabeorte laufender Quests mit grauem Fragezeichen.",
+    TIP_QUEST_GIVER_PINS = "Gelbes \"!\" auf der Weltkarte über NPCs mit Quests, die du jetzt annehmen kannst (Fraktion, Klasse, Stufe und Vorquests passen). Feiertags-, Event-, Spenden- und Schlachtfeldquests fehlen. Maus darüber zeigt die Quests, Klick setzt einen Wegpunkt.",
     TIP_QUEST_OBJECTIVE_PINS = "Zeigt Monster und Dinge zum Sammeln oder Benutzen aus den Zielen laufender Quests auf Weltkarte und Minikarte als kleine Punkte, eine Farbe pro Quest; nahe Punkte werden mit dünnen Linien verbunden. Quests ohne solche Orte erhalten einen hohlen goldenen Ring im Questgebiet des Spiels. Klick setzt einen Wegpunkt.",
 }
 
@@ -366,6 +375,8 @@ local lFrfr = {
     questPinActive = "En cours",
     questPinHint = "Donneur ou lieu de remise · Clic : placer un point de passage",
     questObjectivePins = "Afficher les objectifs des quêtes en cours (carte et minicarte)",
+    questGiverPins = "Afficher les donneurs de quêtes disponibles (!)",
+    questGiverHint = "Donneur de quête · Clic : point de repère",
     questObjHint = "Clic : placer un point de passage",
     questObjArea = "Zone de quête",
     questObjGuess = "(probable : créatures au nom proche)",
@@ -375,6 +386,7 @@ local lFrfr = {
     questGuideNone = "%s : aucun lieu connu",
     TIP_QUEST_LOG_PINS = "Indique d'un point d'interrogation sur la carte du monde où rendre les quêtes terminées de votre journal. Un clic place un point de passage.",
     TIP_QUEST_LOG_PINS_ALL = "Affiche aussi, en gris, les donneurs et lieux de remise des quêtes en cours.",
+    TIP_QUEST_GIVER_PINS = "\"!\" jaune sur la carte au-dessus des PNJ ayant une quête disponible maintenant (faction, classe, niveau et quêtes précédentes). Quêtes de fêtes, d'événements, de dons et de champs de bataille exclues. Survol : liste des quêtes ; clic : point de repère.",
     TIP_QUEST_OBJECTIVE_PINS = "Affiche les monstres et les objets à ramasser ou utiliser des objectifs des quêtes en cours sur la carte et la minicarte, en petits points d'une couleur par quête ; les points proches sont reliés par de fines lignes. Les quêtes sans de tels lieux reçoivent un anneau doré creux sur la zone de quête du jeu. Un clic place un point de passage.",
 }
 
@@ -459,6 +471,8 @@ local lEses = {
     questPinActive = "En curso",
     questPinHint = "Lugar de inicio o entrega · Clic: fijar punto de ruta",
     questObjectivePins = "Mostrar objetivos de misiones en curso (mapa y minimapa)",
+    questGiverPins = "Mostrar quienes dan misiones disponibles (!)",
+    questGiverHint = "Da misiones · Clic: fijar punto de ruta",
     questObjHint = "Clic: fijar punto de ruta",
     questObjArea = "Zona de misión",
     questObjGuess = "(probable: criaturas de nombre parecido)",
@@ -468,6 +482,7 @@ local lEses = {
     questGuideNone = "%s: ningún lugar conocido",
     TIP_QUEST_LOG_PINS = "Marca con un signo de interrogación en el mapa del mundo dónde entregar las misiones terminadas de tu registro. Clic: punto de ruta.",
     TIP_QUEST_LOG_PINS_ALL = "Muestra también, en gris, dónde se inician o entregan las misiones en curso.",
+    TIP_QUEST_GIVER_PINS = "\"!\" amarillo en el mapa sobre los PNJ con una misión disponible ahora (facción, clase, nivel y misiones previas). Se omiten las de festividades, eventos, donaciones y campos de batalla. Al pasar el ratón se ven las misiones; clic fija un punto de ruta.",
     TIP_QUEST_OBJECTIVE_PINS = "Muestra los monstruos y las cosas que recoger o usar de los objetivos de misiones en curso en el mapa y el minimapa, como puntos pequeños de un color por misión; los puntos cercanos se unen con líneas finas. Las misiones sin esos lugares llevan un anillo dorado hueco en la zona de misión del juego. Clic: punto de ruta.",
 }
 
@@ -552,6 +567,8 @@ local lRuru = {
     questPinActive = "Выполняется",
     questPinHint = "Где взять или сдать задание · Клик: поставить путевую точку",
     questObjectivePins = "Показывать цели текущих заданий (карта и миникарта)",
+    questGiverPins = "Показывать НИП с доступными заданиями (!)",
+    questGiverHint = "Даёт задания · Щелчок: путевая точка",
     questObjHint = "Клик: поставить путевую точку",
     questObjArea = "Район задания",
     questObjGuess = "(предположительно: существа с похожим именем)",
@@ -561,6 +578,7 @@ local lRuru = {
     questGuideNone = "%s: место неизвестно",
     TIP_QUEST_LOG_PINS = "Отмечает на карте мира знаком вопроса, где сдать выполненные задания из журнала. Клик ставит путевую точку.",
     TIP_QUEST_LOG_PINS_ALL = "Также показывает серым, где берутся и сдаются незавершённые задания.",
+    TIP_QUEST_GIVER_PINS = "Жёлтый \"!\" на карте мира над НИП с заданием, которое можно взять сейчас (сторона, класс, уровень и предыдущие задания). Праздничные, событийные, сдаточные задания и задания полей боя не показываются. Наведите для списка заданий, щелчок ставит путевую точку.",
     TIP_QUEST_OBJECTIVE_PINS = "Показывает монстров и предметы для сбора или использования из целей текущих заданий на карте и миникарте маленькими точками, свой цвет для каждого задания; близкие точки соединяются тонкими линиями. Задания без таких мест отмечаются полым золотым кольцом в районе задания. Клик ставит путевую точку.",
 }
 
@@ -645,6 +663,8 @@ local lZhcn = {
     questPinActive = "进行中",
     questPinHint = "任务接取或交付地点 · 点击：设置路径点",
     questObjectivePins = "显示进行中任务的目标位置（地图和小地图）",
+    questGiverPins = "显示可接任务的任务发布者（!）",
+    questGiverHint = "任务发布者 · 点击：设置路径点",
     questObjHint = "点击：设置路径点",
     questObjArea = "任务区域",
     questObjGuess = "（推测：名称相近的怪物）",
@@ -654,6 +674,7 @@ local lZhcn = {
     questGuideNone = "%s：没有可指引的地点",
     TIP_QUEST_LOG_PINS = "在世界地图上用问号标出任务日志中已完成任务的交付地点。点击可设置路径点。",
     TIP_QUEST_LOG_PINS_ALL = "同时用灰色问号显示进行中任务的接取或交付地点。",
+    TIP_QUEST_GIVER_PINS = "在世界地图上，有现在可接任务的NPC上方显示黄色“!”（阵营、职业、等级相符且前置任务已完成）。节日、活动、捐献和战场任务不显示。鼠标悬停查看任务，点击设置路径点。",
     TIP_QUEST_OBJECTIVE_PINS = "在世界地图和小地图上用小圆点显示未完成任务目标的怪物和需要收集或使用的物体，每个任务一种颜色，相近的点用细线相连。没有这类位置的任务会在游戏给出的任务区域显示空心金色圆环。点击可设置路径点。",
 }
 
@@ -738,6 +759,8 @@ local lZhtw = {
     questPinActive = "進行中",
     questPinHint = "任務接取或交付地點 · 點擊：設定路徑點",
     questObjectivePins = "顯示進行中任務的目標位置（地圖和小地圖）",
+    questGiverPins = "顯示可接任務的任務發布者（!）",
+    questGiverHint = "任務發布者 · 點擊：設定路徑點",
     questObjHint = "點擊：設定路徑點",
     questObjArea = "任務區域",
     questObjGuess = "（推測：名稱相近的怪物）",
@@ -747,6 +770,7 @@ local lZhtw = {
     questGuideNone = "%s：沒有可指引的地點",
     TIP_QUEST_LOG_PINS = "在世界地圖上用問號標出任務日誌中已完成任務的交付地點。點擊可設定路徑點。",
     TIP_QUEST_LOG_PINS_ALL = "同時用灰色問號顯示進行中任務的接取或交付地點。",
+    TIP_QUEST_GIVER_PINS = "在世界地圖上，有現在可接任務的NPC上方顯示黃色「!」（陣營、職業、等級相符且前置任務已完成）。節日、活動、捐獻和戰場任務不顯示。滑鼠懸停查看任務，點擊設定路徑點。",
     TIP_QUEST_OBJECTIVE_PINS = "在世界地圖和小地圖上用小圓點顯示未完成任務目標的怪物和需要收集或使用的物件，每個任務一種顏色，相近的點以細線相連。沒有這類位置的任務會在遊戲給出的任務區域顯示空心金色圓環。點擊可設定路徑點。",
 }
 

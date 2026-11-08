@@ -30,6 +30,7 @@
 Core\Locales.lua
 Core\UIKit.lua
 Core\Init.lua
+Data\QuestLevels.lua
 UI\LanguageDropdown.lua
 Modules\QuestAutomation.lua
 Modules\QuestAnnounce.lua

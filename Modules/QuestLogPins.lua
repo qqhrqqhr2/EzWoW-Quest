@@ -422,11 +422,11 @@ end
 
 function QuestLogPins.hideAll()
     for _, pin in ipairs(pins) do pin:Hide() end
+    if QuestLogPins.hideGivers then QuestLogPins.hideGivers() end
 end
 
 function QuestLogPins.refresh()
     QuestLogPins.hideAll()
-    if not (ns.DB and ns.DB.questLogPins ~= false) then return end
     if not (WorldMapFrame and WorldMapFrame:IsShown()) then return end
     local project = ns.MapProjector()
     if not project then return end
@@ -440,6 +440,10 @@ function QuestLogPins.refresh()
 
     QuestLogPins.buildIndexes()
     if not questIndex then return end
+    if QuestLogPins.refreshGivers then
+        pcall(QuestLogPins.refreshGivers, mapID, project, canvasFrame, cw, ch, cScale)
+    end
+    if not (ns.DB and ns.DB.questLogPins ~= false) then return end
     local showAll = ns.DB.questLogPinsAll == true
     local groups = {}
     for _, quest in ipairs(QuestLogPins.collectQuests()) do
@@ -532,6 +536,7 @@ function QuestLogPins.rescale()
             any = true
         end
     end
+    if QuestLogPins.rescaleGivers and QuestLogPins.rescaleGivers(canvasFrame, cw, ch, cScale) then any = true end
     if not any then return end
     lastRescaleAt = GetTime()
     if not regroupPending and C_Timer and C_Timer.After then
@@ -542,7 +547,7 @@ end
 
 -- quest log changes: redraw only while the map is open
 local events = CreateFrame("Frame")
-for _, event in ipairs({ "QUEST_LOG_UPDATE", "QUEST_ACCEPTED", "QUEST_REMOVED", "QUEST_TURNED_IN" }) do
+for _, event in ipairs({ "QUEST_LOG_UPDATE", "QUEST_ACCEPTED", "QUEST_REMOVED", "QUEST_TURNED_IN", "PLAYER_LEVEL_UP" }) do
     pcall(events.RegisterEvent, events, event)
 end
 pcall(events.RegisterEvent, events, "QUEST_DETAIL")
@@ -740,17 +745,154 @@ local function questName(questID)
     return entry and entry.names and entry.names.enUS or ("#" .. questID)
 end
 
+-- Holiday and event quests, donations and hand-ins are not regular quests to
+-- go and take: left out by their quest category, or by their English name
+-- when the data has no category for them.
+local SPECIAL_SORTS = {
+    [-22] = true,   -- seasonal (winter festival, harvest festival, ...)
+    [-41] = true,   -- day of the dead
+    [-284] = true,  -- special (children's week, ...)
+    [-364] = true,  -- darkmoon faire
+    [-365] = true,  -- war effort supplies
+    [-366] = true,  -- lunar festival
+    [-367] = true,  -- reputation hand-ins (commendation signets)
+    [-368] = true,  -- invasion
+    [-369] = true,  -- midsummer
+    [-370] = true,  -- brewfest
+    [-374] = true,  -- noblegarden
+    [-375] = true,  -- pilgrim's bounty
+    [-376] = true,  -- love is in the air
+    [-666] = true,  -- other events
+    [-344] = true,  -- legendary item quests
+    [-641] = true, [-644] = true,   -- seasonal content not on this server
+    -- holiday numbering used by the level table
+    [-1001] = true, [-1002] = true, [-1003] = true, [-1004] = true, [-1005] = true, [-1006] = true,
+    -- battleground quests (PvP, not quests to go and take while levelling)
+    [-25] = true, [2597] = true, [3277] = true, [3358] = true,
+}
+
+-- profession quests: only for characters with that profession
+local PROFESSION_SORTS = {
+    [-181] = 171, [-121] = 164, [-304] = 185, [-201] = 202, [-324] = 129, [-101] = 356,
+    [-24] = 182, [-182] = 165, [-264] = 197,
+}
+local SPECIAL_NAMES = {
+    "donation of", "additional runecloth", "commendation signet", "^the horde needs", "^the alliance needs",
+    "great%-?father winter", "winter veil", "hallow's end", "lunar", " the elder$", "darkmoon",
+    "midsummer", "fire festival", "brewfest", "noblegarden", "love is in the air", "children's week",
+    "wrapped present", "treats for",
+    -- war effort rewards and scourge invasion hand-ins
+    "saving the best for last", "^argent dawn ", "light's hope chapel", "blessed wizard oil",
+    "major healing potion", "major mana potion", "the keeper's call", "investigate the scourge",
+    "necrotic",
+}
+local specialCache = {}
+
+local function specialQuest(questID, q)
+    local cached = specialCache[questID]
+    if cached ~= nil then return cached end
+    local special = (q and ((q.sort and SPECIAL_SORTS[q.sort]) or (q.cat and SPECIAL_SORTS[q.cat]))) and true or false
+    if not special then
+        local entry = questIndex and questIndex[questID]
+        local name = entry and entry.names and entry.names.enUS
+        if type(name) == "string" then
+            name = string.lower(name)
+            for _, pattern in ipairs(SPECIAL_NAMES) do
+                if name:find(pattern) then special = true; break end
+            end
+        end
+    end
+    specialCache[questID] = special
+    return special
+end
+
 -- nil when this character can't take the quest (done, in the log, other side,
--- other class, quest before it not done, far above the character's level)
-local function takeable(questID, me)
-    if questDone(questID) or questInLog(questID) then return nil end
+-- other class, quest before it not done, far above the character's level,
+-- holiday / donation quest)
+-- quest info from the game's own data, filled in from the addon's level
+-- table (Data/QuestLevels.lua) when the game data has no entry
+local mergedQuests = {}
+local function questInfo(questID)
+    local merged = mergedQuests[questID]
+    if merged ~= nil then return merged or nil end
     local qd = ns.QuestData and ns.QuestData()
     local q = qd and type(qd.quests) == "table" and qd.quests[questID] or nil
+    local extra = ns.QuestLevels and ns.QuestLevels[questID]
+    if extra then
+        local copy = {}
+        if q then for k, v in pairs(q) do copy[k] = v end end
+        if not (tonumber(copy.lvl) and copy.lvl > 0) then copy.lvl, copy.min = extra[1], extra[2] end
+        copy.side, copy.classMask = extra[3], extra[4]
+        if not copy.sort or copy.sort == 0 then copy.sort = extra[5] end
+        copy.cat = extra[5]
+        copy.needDone, copy.needLog, copy.blockedBy = extra[6], extra[7], extra[8]
+        q = copy
+    end
+    mergedQuests[questID] = q or false
+    return q
+end
+
+-- false when the quest is for the other side or another class / race
+local function questForMe(questID, me)
+    local q = questInfo(questID)
+    if not q then return true end
+    if q.side == 1 and me.faction == "Horde" then return false end
+    if q.side == 2 and me.faction == "Alliance" then return false end
+    if q.classMask and q.classMask > 0 and me.classBit and bit and bit.band
+        and bit.band(q.classMask, me.classBit) == 0 then return false end
+    if q.races and me.raceBit and bit and bit.band and bit.band(q.races, me.raceBit) == 0 then return false end
+    return true
+end
+
+-- a quest to complete first: one ID, or a list where any one will do. A quest
+-- this character can never take (other side, class or race) doesn't hold it back.
+local function requirementMet(need, me)
+    if type(need) == "number" then
+        return questDone(need) or not questForMe(need, me)
+    end
+    if type(need) ~= "table" then return true end
+    local anyForMe = false
+    for _, id in ipairs(need) do
+        if questDone(id) then return true end
+        if questForMe(id, me) then anyForMe = true end
+    end
+    return not anyForMe
+end
+
+local function prerequisitesMet(q, me)
+    if type(q.needDone) == "table" then
+        for _, need in ipairs(q.needDone) do
+            if not requirementMet(need, me) then return false end
+        end
+    end
+    if type(q.needLog) == "table" and #q.needLog > 0 then
+        local any = false
+        for _, id in ipairs(q.needLog) do
+            if id > 0 and questInLog(id) then any = true; break end
+            if id < 0 and (questInLog(-id) or questDone(-id)) then any = true; break end
+        end
+        if not any then return false end
+    end
+    if type(q.blockedBy) == "table" then
+        for _, id in ipairs(q.blockedBy) do
+            if questDone(id) or questInLog(id) then return false end
+        end
+    end
+    return true
+end
+
+local function takeable(questID, me)
+    if questDone(questID) or questInLog(questID) then return nil end
+    local q = questInfo(questID)
+    if specialQuest(questID, q) then return nil end
     if q then
-        if q.races and me.raceBit and bit and bit.band and bit.band(q.races, me.raceBit) == 0 then return nil end
+        if not questForMe(questID, me) then return nil end
+        local skill = PROFESSION_SORTS[q.sort or 0] or PROFESSION_SORTS[q.cat or 0]
+        if skill and me.skills and not me.skills[skill] then return nil end
         local class = CLASS_SORTS[q.sort or 0]
         if class and class ~= me.class then return nil end
         if (q.min or 0) > me.level + LEVEL_AHEAD then return nil end
+        if not prerequisitesMet(q, me) then return nil end
     end
     local prev = prevQuest[questID]
     if prev and not questDone(prev) then return nil end
@@ -759,14 +901,32 @@ end
 
 local function playerInfo()
     local level = (UnitLevel and UnitLevel("player")) or 1
-    local _, class = UnitClass("player")
+    local _, class, classID = UnitClass("player")
     local raceID = select(3, UnitRace("player"))
-    return { level = tonumber(level) or 1, class = class,
+    local faction = UnitFactionGroup and UnitFactionGroup("player")
+    -- professions this character has (skill line IDs); nil when unknown
+    local skills
+    if type(GetProfessions) == "function" and type(GetProfessionInfo) == "function" then
+        local results = { pcall(GetProfessions) }
+        if results[1] then
+            skills = {}
+            for i = 2, 7 do   -- primary 1, primary 2, archaeology, fishing, cooking, first aid (any may be nil)
+                local index = results[i]
+                if type(index) == "number" then
+                    local okInfo, _, _, _, _, _, _, skillLine = pcall(GetProfessionInfo, index)
+                    if okInfo and type(skillLine) == "number" then skills[skillLine] = true end
+                end
+            end
+        end
+    end
+    return { level = tonumber(level) or 1, class = class, faction = faction, skills = skills,
+        classBit = (type(classID) == "number" and classID >= 1 and classID <= 31) and 2 ^ (classID - 1) or nil,
         raceBit = (type(raceID) == "number" and raceID >= 1 and raceID <= 31) and 2 ^ (raceID - 1) or nil }
 end
 
 -- { { text, r, g, b }, ... } for one NPC ID
-function QuestLogPins.npcQuestLines(npcId, me)
+-- nowOnly: only quests that can surely be taken now (map marks)
+function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
     buildNpcQuests()
     me = me or playerInfo()
     local found = {}
@@ -776,16 +936,28 @@ function QuestLogPins.npcQuestLines(npcId, me)
                 r = 0.25, g = 1, b = 0.35 }
         end
     end
+    -- grey quests (far below the character) are left out, and quests that
+    -- share a name (one per race or side) are listed once
+    local floorLevel = QuestLogPins.trivialFloor and QuestLogPins.trivialFloor(me.level) or (me.level - 5)
+    local sameName = {}
     for questID in pairs(npcGives[npcId] or {}) do
         local q = takeable(questID, me)
-        if q then
-            local level = tonumber(q.lvl) or 0
+        local level = q and tonumber(q.lvl) or 0
+        if q and (level <= 0 or level > floorLevel)
+            and not (nowOnly and not (QuestLogPins.takeNow and QuestLogPins.takeNow(q, me, floorLevel))) then
+            local name = questName(questID)
             local tooHigh = (q.min or 0) > me.level
-            local prefix = level > 0 and ("[" .. level .. "] ") or ""
-            local text = "! " .. prefix .. questName(questID)
+            local known = level > 0
+            local prefix = known and ("[" .. level .. "] ") or ""
+            local text = "! " .. prefix .. name
             if tooHigh then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_LEVEL"), q.min) .. ")" end
-            found[#found + 1] = { order = tooHigh and 2 or 1, level = level, text = text,
-                r = tooHigh and 0.6 or 1, g = tooHigh and 0.6 or 0.82, b = tooHigh and 0.6 or 0 }
+            if not sameName[text] then
+                sameName[text] = true
+                -- yellow: can take now · pale yellow: level not known · grey: later
+                found[#found + 1] = { order = tooHigh and 3 or known and 1 or 2, level = level, text = text,
+                    r = tooHigh and 0.6 or known and 1 or 0.85, g = tooHigh and 0.6 or known and 0.82 or 0.78,
+                    b = tooHigh and 0.6 or known and 0 or 0.5 }
+            end
         end
     end
     table.sort(found, function(a, b)
@@ -799,6 +971,182 @@ function QuestLogPins.npcQuestLines(npcId, me)
         found[#found + 1] = { text = string.format(ns:L("NPC_TT_MORE"), more), r = 0.6, g = 0.6, b = 0.6 }
     end
     return found
+end
+
+-----------------------------------------------------------------------------
+-- Quest givers on the World Map: a yellow "!" over each NPC with a quest this
+-- character can take now, a grey one when its quests are a few levels away.
+-- Same rules as the NPC tooltip. Spots are worked out once per map.
+-----------------------------------------------------------------------------
+local ICON_GIVER = "Interface\\GossipFrame\\AvailableQuestIcon"
+local giverPins = {}
+local giverSpotsByMap = {}     -- mapID -> { { npcId, sp, mx, my }, ... }
+
+local function giverSpotsFor(mapID, project)
+    local cached = giverSpotsByMap[mapID]
+    if cached then return cached end
+    cached = {}
+    for npcId in pairs(npcGives) do
+        local entry = entryByKey["npc:" .. npcId]
+        for _, sp in ipairs(entry and entry.spawns or {}) do
+            local mapID2, mx, my = project(sp, mapID)
+            if mx and my and mapID2 == mapID then
+                cached[#cached + 1] = { npcId = npcId, sp = sp, mx = mx, my = my }
+            end
+        end
+    end
+    giverSpotsByMap[mapID] = cached
+    return cached
+end
+
+-- Quests far below the character's level (grey in the game) are left out,
+-- like the game's own map does.
+local function trivialBelow(level)
+    if type(UnitQuestTrivialLevelRange) == "function" then
+        local ok, range = pcall(UnitQuestTrivialLevelRange, "player")
+        if ok and type(range) == "number" and not isSecret(range) and range > 0 then return level - range end
+    end
+    return level - 5
+end
+QuestLogPins.trivialFloor = trivialBelow
+
+-- The map shows only quests the character can surely take now: level known,
+-- reachable, and not grey. Quests without a level in the data stay off the
+-- map (they are still listed on the NPC's own tooltip).
+local STATE_RANK = { now = 3, unknown = 2, soon = 1 }
+
+local function takeNow(q, me, floorLevel)
+    local lvl = q and tonumber(q.lvl)
+    return lvl and lvl > 0 and q.min and lvl > floorLevel and q.min <= me.level or false
+end
+QuestLogPins.takeNow = takeNow
+
+local function giverState(npcId, me)
+    local floorLevel = trivialBelow(me.level)
+    for questID in pairs(npcGives[npcId] or {}) do
+        if takeNow(takeable(questID, me), me, floorLevel) then return "now" end
+    end
+    return nil
+end
+
+local function obtainGiverPin(index)
+    local pin = giverPins[index]
+    if pin then return pin end
+    pin = CreateFrame("Button", nil, QuestLogPins.canvas())
+    pin:EnableMouse(true)
+    pin:RegisterForClicks("LeftButtonUp")
+    setPropagateClicks(pin, false)
+    pin:SetSize(15, 15)
+    pin:SetFrameStrata("HIGH")
+    local disc = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+    pin.rim = pin:CreateTexture(nil, "BACKGROUND", nil, 0)
+    pin.rim:SetTexture(disc)
+    pin.rim:SetPoint("CENTER")
+    pin.rim:SetSize(16, 16)
+    pin.back = pin:CreateTexture(nil, "BACKGROUND", nil, 1)
+    pin.back:SetTexture(disc)
+    pin.back:SetPoint("CENTER")
+    pin.back:SetSize(14, 14)
+    pin.back:SetVertexColor(0.08, 0.06, 0.04, 0.92)
+    pin.icon = pin:CreateTexture(nil, "ARTWORK")
+    pin.icon:SetPoint("CENTER")
+    pin.icon:SetSize(12, 12)
+    pin.icon:SetTexture(ICON_GIVER)
+    pin:SetScript("OnEnter", function(self)
+        local group = self.group
+        if not group then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local me = playerInfo()
+        local first = true
+        for _, npcId in ipairs(group.npcIds) do
+            local lines = QuestLogPins.npcQuestLines(npcId, me, true)
+            if #lines > 0 then
+                local entry = entryByKey["npc:" .. npcId]
+                local name = entry and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(entry) or ("#" .. npcId)
+                if first then GameTooltip:SetText(name, unpack(Theme.accent)) else GameTooltip:AddLine(name, unpack(Theme.accent)) end
+                first = false
+                for _, l in ipairs(lines) do GameTooltip:AddLine(l.text, l.r, l.g, l.b) end
+            end
+        end
+        if first then GameTooltip:SetText("EzWoW - Quest", unpack(Theme.accent)) end
+        GameTooltip:AddLine(ns:L("questGiverHint"), unpack(Theme.muted))
+        GameTooltip:AddDoubleLine(" ", "EzWoW - Quest", 0, 0, 0, 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+        if _G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.Refit then pcall(_G.EzWoWTooltipTagSizer.Refit, GameTooltip) end
+    end)
+    pin:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    pin:HookScript("OnEnter", raisePin)
+    pin:HookScript("OnLeave", lowerPin)
+    pin:SetScript("OnClick", function(self)
+        local sp = self.group and self.group.spawn
+        if sp then ns.ApplyWaypointForSpawn(sp) end
+    end)
+    ns.PassMapRightClicks(pin)
+    giverPins[index] = pin
+    return pin
+end
+
+function QuestLogPins.hideGivers()
+    for _, pin in ipairs(giverPins) do pin:Hide() end
+end
+
+function QuestLogPins.refreshGivers(mapID, project, canvasFrame, cw, ch, cScale)
+    QuestLogPins.hideGivers()
+    if not (ns.DB and ns.DB.questGiverPins ~= false) then return end
+    buildNpcQuests()
+    local me = playerInfo()
+    local states = {}
+    local groups = {}
+    for _, spot in ipairs(giverSpotsFor(mapID, project)) do
+        local state = states[spot.npcId]
+        if state == nil then
+            state = giverState(spot.npcId, me) or false
+            states[spot.npcId] = state
+        end
+        if state then
+            local px, py = spot.mx * cw, spot.my * ch
+            local group
+            for _, g in ipairs(groups) do
+                if math.abs(g.px - px) * cScale < MERGE_PIXELS and math.abs(g.py - py) * cScale < MERGE_PIXELS then
+                    group = g
+                    break
+                end
+            end
+            if not group then
+                group = { px = px, py = py, cw = cw, ch = ch, spawn = spot.sp, npcIds = {}, seen = {} }
+                groups[#groups + 1] = group
+            end
+            if not group.seen[spot.npcId] then
+                group.seen[spot.npcId] = true
+                group.npcIds[#group.npcIds + 1] = spot.npcId
+            end
+            if not group.state or STATE_RANK[state] > STATE_RANK[group.state] then group.state = state end
+        end
+    end
+    for index, group in ipairs(groups) do
+        local pin = obtainGiverPin(index)
+        local now, unknown = group.state == "now", group.state == "unknown"
+        pin:SetParent(canvasFrame)
+        pin:SetFrameLevel((canvasFrame:GetFrameLevel() or 10) + (now and 180 or unknown and 175 or 170))
+        pin.group = group
+        -- yellow: can take now · faint yellow: level not known · grey: a few levels later
+        pin.icon:SetDesaturated(not (now or unknown))
+        pin.icon:SetAlpha(now and 1 or unknown and 0.55 or 0.75)
+        pin.rim:SetVertexColor(now and 0.95 or 0.6, now and 0.85 or 0.6, now and 0.45 or 0.6, now and 0.95 or 0.6)
+        QuestLogPins.anchorPin(pin, canvasFrame, cw, ch, cScale)
+        pin:Show()
+    end
+end
+
+function QuestLogPins.rescaleGivers(canvasFrame, cw, ch, cScale)
+    local any = false
+    for _, pin in ipairs(giverPins) do
+        if pin:IsShown() and pin.group then
+            QuestLogPins.anchorPin(pin, canvasFrame, cw, ch, cScale)
+            any = true
+        end
+    end
+    return any
 end
 
 local function npcTooltipOn()

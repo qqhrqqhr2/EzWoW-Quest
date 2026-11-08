@@ -193,7 +193,7 @@ end
 function SettingsDialog.syncMapOptionRows(windowFrame)
     local hasMap = ns.HasMapFinder()
     local savedDB = ns:InitializeDatabase()
-    for _, key in ipairs({ "chkQuestLogPins", "chkQuestLogPinsAll", "chkQuestObjectivePins" }) do
+    for _, key in ipairs({ "chkQuestLogPins", "chkQuestLogPinsAll", "chkQuestObjectivePins", "chkQuestGiverPins" }) do
         local rowWidget = windowFrame[key]
         if rowWidget and rowWidget.SetRowEnabled then rowWidget:SetRowEnabled(hasMap) end
     end
@@ -259,7 +259,7 @@ function ns:CreateSettingsWindow()
     if settingsFrame then return settingsFrame end
 
     local windowFrame = CreateFrame("Frame", SETTINGS_NAME, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    windowFrame:SetSize(480, 537)
+    windowFrame:SetSize(480, 560)
     windowFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     windowFrame:SetFrameStrata("FULLSCREEN_DIALOG")
     windowFrame:SetToplevel(true)
@@ -411,10 +411,15 @@ function ns:CreateSettingsWindow()
         refreshMapMarks()
     end)
     windowFrame.chkQuestObjectivePins.tipKey = "TIP_QUEST_OBJECTIVE_PINS"
+    windowFrame.chkQuestGiverPins = SettingsDialog.buildFlatCheckbox(windowFrame, 20, -464, function(checked)
+        ns:InitializeDatabase().questGiverPins = checked
+        refreshMapMarks()
+    end)
+    windowFrame.chkQuestGiverPins.tipKey = "TIP_QUEST_GIVER_PINS"
 
     local mapNote = windowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    mapNote:SetPoint("TOPLEFT", windowFrame, "TOPLEFT", 22, -469)
-    mapNote:SetPoint("TOPRIGHT", windowFrame, "TOPRIGHT", -20, -469)
+    mapNote:SetPoint("TOPLEFT", windowFrame, "TOPLEFT", 22, -492)
+    mapNote:SetPoint("TOPRIGHT", windowFrame, "TOPRIGHT", -20, -492)
     mapNote:SetJustifyH("LEFT")
     mapNote:SetTextColor(unpack(STYLE.danger))
     mapNote:Hide()
@@ -511,6 +516,8 @@ function ns:RefreshSettingsUI()
         w.chkQuestLogPinsAll:SetChecked(savedDB.questLogPinsAll == true)
         SettingsDialog.setFittedLabel(w.chkQuestObjectivePins, self:L("questObjectivePins"))
         w.chkQuestObjectivePins:SetChecked(savedDB.questObjectivePins ~= false)
+        SettingsDialog.setFittedLabel(w.chkQuestGiverPins, self:L("questGiverPins"))
+        w.chkQuestGiverPins:SetChecked(savedDB.questGiverPins ~= false)
         w.mapNote:SetText(self:L("MAP_NEEDS_MAPFINDER"))
         SettingsDialog.syncMapOptionRows(w)
 
