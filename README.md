@@ -67,6 +67,13 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 - 퀘스트 레벨은 WoW Forever 서버 기준입니다.
 - **NPC 툴팁과 미니맵 툴팁**에도 그 NPC에게서 받을 수 있는 퀘스트(노란 `!`, 몇 레벨 뒤에 받을 수 있는 퀘스트는 회색으로 "Lv.N부터")와 그 NPC에게 보고할 퀘스트(초록 `?`, "보고")가 나옵니다.
 
+#### 알아낸 퀘스트 위치와 공유
+
+- 퀘스트를 주고받는 NPC, 퀘스트 아이템이 나온 몬스터·오브젝트, 도착·정찰 목표를 마친 곳을 기억해서 지도에 보여 줍니다.
+- 이 기록을 파티·길드와 이 애드온을 쓰는 다른 사람과 자동으로 공유합니다(애드온 메시지만 쓰고 채팅창에는 아무것도 나오지 않으며, 이름은 저장하지 않습니다). 공유 채널로 받은 퀘스트 NPC·몬스터 드롭은 여러 사람이 같은 내용을 보냈을 때 쓰고, 위치(정찰 지점, 오브젝트)는 받는 대로 씁니다.
+- 이를 위해 숨은 채널에 들어갑니다. 내 채널 번호가 바뀌지 않도록 높은 번호(10번 이상)를 씁니다. 같은 채널 사람끼리는 채널 목록에서 캐릭터 이름이 보입니다.
+- 설정에서 끌 수 있습니다("알아낸 퀘스트 위치를 다른 EzWoW 사용자와 공유").
+
 #### 세계지도 퀘스트 목록
 
 - 세계지도의 퀘스트 목록을 열면 지도 창 오른쪽 바깥에 버튼 두 개가 나옵니다.
@@ -146,7 +153,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 
 ### 저장 데이터
 
-- `EzWoW_QuestDB`: 설정, 추적기 위치·크기·접힘·숨긴 퀘스트, 게임 중에 알아낸 퀘스트 정보(아이템을 떨어뜨리는 몬스터 등).
+- `EzWoW_QuestDB`: 설정, 추적기 위치·크기·접힘·숨긴 퀘스트, 게임 중에 알아낸 퀘스트 정보(퀘스트 NPC, 아이템을 떨어뜨리는 몬스터, 정찰 지점 등)와 다른 사용자에게 받은 정보.
 
 ---
 
@@ -205,6 +212,13 @@ Hover a dot, question mark or exclamation mark on the map to see the quest and o
 - Holiday, event, donation and battleground quests, and low-level quests (grey in the game), are not shown.
 - Quest levels follow the WoW Forever server.
 - **NPC and minimap tooltips** also list the quests that NPC gives (yellow `!`; quests a few levels away in grey with "from Lv.N") and the finished quests to hand in there (green `?`, "hand in").
+
+#### Learned and shared quest spots
+
+- Remembers who gives and takes in your quests, which creatures and objects quest items come from, and where "reach" / "scout" objectives are done, and shows them on the map.
+- Shares them with your party, guild and other players of this addon automatically (addon messages only, nothing appears in chat, no names are stored). Quest NPCs and creature drops from the shared channel are used once several players report the same; places (scouting spots, looted objects) are used as they arrive.
+- For this the addon joins a hidden channel with a high number (10 or higher), so your own channel numbers stay the same. Players in that channel can see each other's character names in the channel list.
+- Can be turned off in the settings ("Share learned quest spots with other EzWoW users").
 
 #### World Map quest list
 
@@ -285,5 +299,5 @@ Turn it on in the **Quest automation** section of the settings. Hold **Shift** w
 
 ### Saved data
 
-- `EzWoW_QuestDB`: settings, tracker position, size, folded and hidden quests, and quest data learned while playing (such as which creatures drop quest items).
+- `EzWoW_QuestDB`: settings, tracker position, size, folded and hidden quests, quest data learned while playing (quest NPCs, which creatures drop quest items, scouting spots) and data received from other players.
 

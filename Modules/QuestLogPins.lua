@@ -606,6 +606,15 @@ local function rememberStarter(questID, starter)
     if not questID or not starter or isSecret(questID) then return end
     local store = starterStore()
     if store then store[questID] = starter end
+    -- kept for good (the entry above goes once the quest is turned in): who
+    -- gives the quest, for the quest giver marks; shared with other players
+    if ns.DB then
+        if type(ns.DB.questGivers) ~= "table" then ns.DB.questGivers = {} end
+        local sources = ns.QuestSources
+        local spot = sources and sources.playerSpot and sources.playerSpot()
+        ns.DB.questGivers[questID] = { key = starter, spot = spot }
+        if QuestLogPins.resetNpcQuests then QuestLogPins.resetNpcQuests() end
+    end
 end
 
 local function onQuestEvent(event, ...)
@@ -706,6 +715,20 @@ local function buildNpcQuests()
             if type(q) == "table" and q.next then prevQuest[q.next] = questID end
         end
     end
+    -- quest givers checked in the game: built-in data (givers[questID] =
+    -- { "npc", ID, ... }) and the ones learned here or shared by other players
+    if qd and type(qd.givers) == "table" then
+        for questID, row in pairs(qd.givers) do
+            if type(row) == "table" and row[1] == "npc" and type(row[2]) == "number" then
+                setAdd(npcGives, row[2], questID)
+            end
+        end
+    end
+    local learned = ns.DB and type(ns.DB.questGivers) == "table" and ns.DB.questGivers
+    for questID, rec in pairs(learned or {}) do
+        local npcId = type(rec) == "table" and type(rec.key) == "string" and tonumber(rec.key:match("^npc:(%d+)$"))
+        if type(questID) == "number" and npcId then setAdd(npcGives, npcId, questID) end
+    end
 end
 
 -- Quest NPCs near the player, by name. The minimap tooltip only has names, and
@@ -736,6 +759,8 @@ local function gameNpcName(npcId)
 end
 
 local function nearbyByName()
+    buildNpcQuests()
+    if not (npcGives and npcTakes) then return {} end
     local now = GetTime and GetTime() or 0
     local continent, px, py = playerWorld()
     if not continent then return nearby.names or {} end
@@ -1057,6 +1082,12 @@ end
 local ICON_GIVER = "Interface\\GossipFrame\\AvailableQuestIcon"
 local giverPins = {}
 local giverSpotsByMap = {}     -- mapID -> { { npcId, sp, mx, my }, ... }
+
+-- a quest giver learned or received: the NPC lists are made again
+function QuestLogPins.resetNpcQuests()
+    npcGives, npcTakes, prevQuest = nil, nil, nil
+    giverSpotsByMap = {}
+end
 
 local function giverSpotsFor(mapID, project)
     local cached = giverSpotsByMap[mapID]

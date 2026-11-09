@@ -345,6 +345,18 @@ local function itemDropStore()
     return ns.DB.questDropItems
 end
 
+-- every spot of a looted object: the first one, plus the other places
+-- players reported for it (value.more)
+local function objectSpots(value)
+    local spots = { value }
+    if type(value.more) == "table" then
+        for _, sp in ipairs(value.more) do
+            if type(sp) == "table" and type(sp[1]) == "number" then spots[#spots + 1] = sp end
+        end
+    end
+    return spots
+end
+
 local function learnedDropEntries(itemKey)
     local store = dropStore()
     local ids = store and store[itemKey]
@@ -359,7 +371,7 @@ local function learnedDropEntries(itemKey)
             if type(value) == "table" and type(value[1]) == "number" then
                 local objectID = tonumber(id:sub(3))
                 local known = objectID and objectById[objectID]
-                e = { id = objectID, kind = "object", names = known and known.names, spawns = { value } }
+                e = { id = objectID, kind = "object", names = known and known.names, spawns = objectSpots(value) }
             end
         else
             e = npcById[tonumber(id)]
@@ -676,7 +688,7 @@ local function entriesFromId(objType, id)
                     local objectID = tonumber(key:match("^o:(%d+)$"))
                     local known = objectID and objectById[objectID]
                     if #list < MAX_GUESS_ENTRIES then
-                        list[#list + 1] = { id = objectID, kind = "object", names = known and known.names, spawns = { value } }
+                        list[#list + 1] = { id = objectID, kind = "object", names = known and known.names, spawns = objectSpots(value) }
                     end
                 end
             end
@@ -805,6 +817,10 @@ function QuestObjectivePins.rebuildQuests()
                     obj.entries = byId or QuestObjectivePins.matchObjective(obj.type, obj.text)
                     if obj.type == "item" then
                         obj.itemKey = normalize(stripCounts(obj.text))
+                        if type(dataObj) == "table" and dataObj[1] == "item" and type(dataObj[2]) == "number"
+                            and dataObj[2] > 0 then
+                            obj.itemID = dataObj[2]
+                        end
                         local learned = obj.itemKey and learnedDropEntries(obj.itemKey)
                         -- no guessed spots (creatures named like the item): they were often wrong
                         if learned then
@@ -1553,7 +1569,8 @@ local function learnFromLoot()
                     tbl[k][id] = true
                     learnedAny = true
                 elseif type(value) == "table" and (type(current) ~= "table" or current.shared) then
-                    tbl[k][id] = { value[1], value[2], value[3] }
+                    -- other places players reported for this object are kept
+                    tbl[k][id] = { value[1], value[2], value[3], more = type(current) == "table" and current.more or nil }
                     learnedAny = true
                 end
             end
@@ -1610,23 +1627,36 @@ local function learnFromUnitTooltip(tooltip, data)
         for _, obj in ipairs(quest.objectives) do
             if obj.type == "item" and obj.itemKey and not obj.finished then
                 wanted = wanted or {}
-                wanted[obj.itemKey] = true
+                -- the item's ID when the quest data knows it, else true
+                wanted[obj.itemKey] = obj.itemID or wanted[obj.itemKey] or true
             end
         end
     end
     if not wanted then return end
     local store = dropStore()
     if not store then return end
+    local byItem = itemDropStore()
     for i = 2, #data.lines do
         local text = data.lines[i] and data.lines[i].leftText
         if type(text) == "string" and not isSecret(text) then
             local key = normalize(stripCounts(text:gsub("^%s*%-%s*", "")))
             if key and wanted[key] then
                 store[key] = store[key] or {}
+                local learned = false
                 if store[key][npcId] ~= true then
                     store[key][npcId] = true
-                    queueRefresh()
+                    learned = true
                 end
+                -- also by item ID (built-in data and players of other languages)
+                local itemID = wanted[key]
+                if byItem and type(itemID) == "number" then
+                    byItem[itemID] = byItem[itemID] or {}
+                    if byItem[itemID][npcId] ~= true then
+                        byItem[itemID][npcId] = true
+                        learned = true
+                    end
+                end
+                if learned then queueRefresh() end
             end
         end
     end

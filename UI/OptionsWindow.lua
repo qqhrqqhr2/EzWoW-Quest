@@ -542,7 +542,7 @@ function ns:RefreshSettingsUI()
 end
 
 -- Every setting back to its default; learned quest data is kept.
-local KEEP_ON_RESET = { questDropSources = true, questStarters = true, questEnders = true, questEventSpots = true, questDropItems = true, lang = true }
+local KEEP_ON_RESET = { questDropSources = true, questStarters = true, questEnders = true, questEventSpots = true, questDropItems = true, questEventShared = true, questGivers = true, lang = true }
 
 function ns:ResetToDefaults()
     local savedDB = self:InitializeDatabase()

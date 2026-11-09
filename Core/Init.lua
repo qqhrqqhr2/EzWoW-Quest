@@ -60,6 +60,8 @@ ns.DEFAULTS = {
     questEnders = {},
     questEventSpots = {},
     questDropItems = {},
+    questEventShared = {},
+    questGivers = {},
     -- sharing learned spots with other players of this addon
     questShareData = true,
     questShareChannel = true,

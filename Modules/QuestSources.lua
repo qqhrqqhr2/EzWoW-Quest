@@ -45,6 +45,8 @@ local function playerSpot()
     return { continent, floor(x * 10 + 0.5) / 10, floor(y * 10 + 0.5) / 10 }
 end
 
+QuestSources.playerSpot = playerSpot
+
 -- "npc:123" / "object:123" for the NPC or object the quest window belongs to
 local function guidKey(guid)
     if type(guid) ~= "string" or isSecret(guid) then return nil end
@@ -158,6 +160,21 @@ end
 function QuestSources.eventEntries(questID, objIndex)
     local saved = ns.DB and type(ns.DB.questEventSpots) == "table" and ns.DB.questEventSpots[questID]
     local spot = type(saved) == "table" and saved[objIndex]
+    -- this character's own spot
+    if isSpot(spot) and not spot.shared then
+        return { { kind = "spot", spawns = { spot }, learned = true } }
+    end
+    -- spots confirmed by other players (a scouting area can have several)
+    local shared = ns.DB and type(ns.DB.questEventShared) == "table" and ns.DB.questEventShared[questID]
+    local list = type(shared) == "table" and shared[objIndex]
+    if type(list) == "table" then
+        local spawns = {}
+        for _, s in ipairs(list) do
+            if isSpot(s) then spawns[#spawns + 1] = s end
+        end
+        if #spawns > 0 then return { { kind = "spot", spawns = spawns, learned = true } } end
+    end
+    -- confirmed by an earlier version (one spot)
     if isSpot(spot) then
         return { { kind = "spot", spawns = { spot }, learned = true } }
     end

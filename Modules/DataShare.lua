@@ -5,12 +5,14 @@
 --===========================================================================
 -- What is shared: only what this character learned itself -
 --   E  the NPC / object a quest is turned in to (and the spot)
+--   S  the NPC / object a quest is taken from (and the spot)
 --   D  a creature a quest item dropped from (by the item's name)
 --   O  an object a quest item was looted from, with its spot
 --   V  the spot an "event" objective (reach / scout a place) was completed
 --   I  a creature or object a quest item (by item ID) was looted from
 -- Received records wait until enough different players sent the same one:
--- one from the party, raid or guild, two from the server-wide channel.
+-- one from the party, raid or guild, two from the server-wide channel
+-- (spots - where a place was scouted or an object looted - are used as they arrive).
 -- Received records are never sent on, and never replace this character's
 -- own records. Senders are kept only as a number (no names are saved).
 local _, ns = ...
@@ -91,12 +93,14 @@ local function ownRecords()
     local list = {}
     local db = ns.DB
     if not db then return list end
-    if type(db.questEnders) == "table" then
-        for questID, rec in pairs(db.questEnders) do
-            if type(questID) == "number" and type(rec) == "table" and not rec.shared and type(rec.key) == "string" then
-                local kind, id = rec.key:match("^(%a)%a*:(%d+)$")
-                if kind == "n" or kind == "o" then
-                    list[#list + 1] = { "E", questID .. "," .. kind .. "," .. id .. (spotText(rec.spot) and ("," .. spotText(rec.spot)) or "") }
+    for code, storeName in pairs({ E = "questEnders", S = "questGivers" }) do
+        if type(db[storeName]) == "table" then
+            for questID, rec in pairs(db[storeName]) do
+                if type(questID) == "number" and type(rec) == "table" and not rec.shared and type(rec.key) == "string" then
+                    local kind, id = rec.key:match("^(%a)%a*:(%d+)$")
+                    if kind == "n" or kind == "o" then
+                        list[#list + 1] = { code, questID .. "," .. kind .. "," .. id .. (spotText(rec.spot) and ("," .. spotText(rec.spot)) or "") }
+                    end
                 end
             end
         end
@@ -146,8 +150,22 @@ local function ownRecords()
 end
 
 -----------------------------------------------------------------------------
--- Applying a confirmed record
+-- Receiving: votes
 -----------------------------------------------------------------------------
+-- Two kinds of records are confirmed differently:
+--  * facts by ID (which NPC takes a quest in, which creature drops an item):
+--    the IDs alone are counted; the spot sent with a turn-in is only kept
+--    beside it. Counting goes on after a fact is confirmed, so a value more
+--    players report later replaces an earlier one.
+--  * spots (where a scouting objective was done, where an object was looted)
+--    were seen by the player who sent them, so they are used as soon as they
+--    arrive. A scouting area keeps every spot reported; the same place sent
+--    again (each player resends from time to time) is kept once.
+-- This character's own records always come first and are never replaced.
+local SAME_SPOT = 3             -- yards: closer than this is the same spot
+local MAX_EVENT_SPOTS = 20      -- spots kept per scouting objective
+local MAX_SENDERS = 20          -- senders remembered per value
+
 local function store(key)
     if not ns.DB then return nil end
     if type(ns.DB[key]) ~= "table" then ns.DB[key] = {} end
@@ -156,75 +174,12 @@ end
 
 local changed = false
 
-local function apply(kind, body)
-    if kind == "E" then
-        local q, k, id, rest = body:match("^(%d+),([no]),(%d+),?(.*)$")
-        q, id = intIn(q, 1, 1000000), intIn(id, 1, 10000000)
-        if not (q and id) then return end
-        local enders = store("questEnders")
-        local mine = enders and enders[q]
-        if not enders or (type(mine) == "table" and not mine.shared) then return end
-        enders[q] = { key = (k == "n" and "npc:" or "object:") .. id, spot = parseSpot(rest), shared = true }
-        changed = true
-    elseif kind == "V" then
-        local q, index, rest = body:match("^(%d+),(%d+),(.+)$")
-        q, index = intIn(q, 1, 1000000), intIn(index, 1, 20)
-        local spot = parseSpot(rest)
-        if not (q and index and spot) then return end
-        local spots = store("questEventSpots")
-        if not spots then return end
-        spots[q] = spots[q] or {}
-        if spots[q][index] then return end
-        spot.shared = true
-        spots[q][index] = spot
-        changed = true
-    elseif kind == "I" then
-        local itemID, k, id, rest = body:match("^(%d+),([no]),(%d+),?(.*)$")
-        itemID, id = intIn(itemID, 1, 10000000), intIn(id, 1, 10000000)
-        if not (itemID and id) then return end
-        local items = store("questDropItems")
-        if not items then return end
-        items[itemID] = items[itemID] or {}
-        if k == "n" then
-            if items[itemID][id] then return end
-            items[itemID][id] = "s"
-        else
-            local spot = parseSpot(rest)
-            local key = "o:" .. id
-            if not spot or type(items[itemID][key]) == "table" then return end
-            spot.shared = true
-            items[itemID][key] = spot
-        end
-        changed = true
-    elseif kind == "D" then
-        local id, name = body:match("^(%d+),(.+)$")
-        id, name = intIn(id, 1, 10000000), cleanName(name)
-        if not (id and name) then return end
-        local drops = store("questDropSources")
-        if not drops then return end
-        drops[name] = drops[name] or {}
-        if drops[name][id] then return end
-        drops[name][id] = "s"
-        changed = true
-    elseif kind == "O" then
-        local id, c, x, y, name = body:match("^(%d+),(%d+),(%-?[%d%.]+),(%-?[%d%.]+),(.+)$")
-        id, name = intIn(id, 1, 10000000), cleanName(name)
-        local spot = parseSpot(c and (c .. "," .. x .. "," .. y))
-        if not (id and name and spot) then return end
-        local drops = store("questDropSources")
-        if not drops then return end
-        drops[name] = drops[name] or {}
-        local key = "o:" .. id
-        if type(drops[name][key]) == "table" then return end
-        spot.shared = true
-        drops[name][key] = spot
-        changed = true
-    end
+local function sameSpot(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" or a[1] ~= b[1] then return false end
+    local dx, dy = a[2] - b[2], a[3] - b[3]
+    return dx * dx + dy * dy <= SAME_SPOT * SAME_SPOT
 end
 
------------------------------------------------------------------------------
--- Receiving
------------------------------------------------------------------------------
 -- a number for the sender, so the same player is counted once
 local function senderHash(sender)
     local h = 5381
@@ -245,6 +200,8 @@ local function allow(hash, n)
     return row.n <= RECEIVE_PER_MINUTE
 end
 
+-- Inbox rows (facts only): key "v2:..." -> { t = last report, v = { [value] = { s, n, p } } }
+local INBOX_VERSION = "v2:"
 local inboxCount
 
 local function inbox()
@@ -253,7 +210,8 @@ local function inbox()
         inboxCount = 0
         local oldest = now() - INBOX_DAYS * 86400
         for key, row in pairs(box) do
-            if type(row) ~= "table" or (row.t or 0) < oldest then
+            if type(key) ~= "string" or key:sub(1, #INBOX_VERSION) ~= INBOX_VERSION
+                or type(row) ~= "table" or (row.t or 0) < oldest then
                 box[key] = nil
             else
                 inboxCount = inboxCount + 1
@@ -263,24 +221,146 @@ local function inbox()
     return box
 end
 
-local function vote(kind, body, hash, needed)
+local function inboxRow(key)
     local box = inbox()
-    if not box then return end
-    local key = kind .. ";" .. body
+    if not box then return nil end
+    key = INBOX_VERSION .. key
     local row = box[key]
     if not row then
-        if inboxCount >= INBOX_MAX then return end
-        row = { s = {}, n = 0, t = now() }
+        if inboxCount >= INBOX_MAX then return nil end
+        row = {}
         box[key] = row
         inboxCount = inboxCount + 1
     end
-    if row.s[hash] then return end
-    row.s[hash] = true
-    row.n = row.n + 1
-    if row.n >= needed then
-        apply(kind, body)
-        box[key] = nil
-        inboxCount = inboxCount - 1
+    row.t = now()
+    return row
+end
+
+-- one sender's vote for a value; returns the value's entry (or nil when the
+-- sender was counted already)
+local function voteValue(key, value, hash, spot)
+    local row = inboxRow(key)
+    if not row then return nil end
+    row.v = row.v or {}
+    local entry = row.v[value]
+    if not entry then
+        entry = { s = {}, n = 0 }
+        row.v[value] = entry
+    end
+    if entry.s[hash] or entry.n >= MAX_SENDERS then return nil end
+    entry.s[hash] = true
+    entry.n = entry.n + 1
+    if spot and not entry.p then entry.p = spot end
+    return entry, row
+end
+
+-----------------------------------------------------------------------------
+-- Receiving: records
+-----------------------------------------------------------------------------
+-- E / S: who takes a quest in / gives it out "questID,n|o,ID[,continent,x,y]"
+local function receiveQuestNpc(code, storeName, body, hash, needed)
+    local q, k, id, rest = body:match("^(%d+),([no]),(%d+),?(.*)$")
+    q, id = intIn(q, 1, 1000000), intIn(id, 1, 10000000)
+    if not (q and id) then return end
+    local value = (k == "n" and "npc:" or "object:") .. id
+    local entry = voteValue(code .. ":" .. q, value, hash, parseSpot(rest))
+    if not entry or entry.n < needed then return end
+    local enders = store(storeName)
+    local current = enders and enders[q]
+    if not enders or (type(current) == "table" and not current.shared) then return end
+    if type(current) == "table" and current.key == value then
+        current.n = entry.n
+        return
+    end
+    -- a different value replaces a confirmed one only when more players report it
+    if type(current) == "table" and entry.n <= (current.n or 0) then return end
+    enders[q] = { key = value, spot = entry.p, shared = true, n = entry.n }
+    changed = true
+end
+
+-- V: scouting spot "questID,objective,continent,x,y" (used as it arrives)
+local function receiveEventSpot(body)
+    local q, index, rest = body:match("^(%d+),(%d+),(.+)$")
+    q, index = intIn(q, 1, 1000000), intIn(index, 1, 20)
+    local spot = parseSpot(rest)
+    if not (q and index and spot) then return end
+    local shared = store("questEventShared")
+    if not shared then return end
+    shared[q] = shared[q] or {}
+    local list = shared[q][index] or {}
+    shared[q][index] = list
+    for _, s in ipairs(list) do
+        if sameSpot(s, spot) then return end
+    end
+    if #list >= MAX_EVENT_SPOTS then return end
+    list[#list + 1] = spot
+    changed = true
+end
+
+-- a creature that drops an item: store[key][npcID] = "s"
+local function receiveDropFact(storeName, key, npcID, hash, needed, voteKey)
+    local entry = voteValue(voteKey, "1", hash)
+    if not entry or entry.n < needed then return end
+    local tbl = store(storeName)
+    if not tbl then return end
+    tbl[key] = tbl[key] or {}
+    if tbl[key][npcID] then return end
+    tbl[key][npcID] = "s"
+    changed = true
+end
+
+-- an object an item is looted from: store[key]["o:ID"] = spot, used as it
+-- arrives. Other places reported for the same object are added to .more
+-- (an object stands in many places); this character's own spot stays first.
+local MAX_OBJECT_SPOTS = 20
+local function receiveDropSpot(storeName, key, objectID, spot)
+    local tbl = store(storeName)
+    if not tbl then return end
+    tbl[key] = tbl[key] or {}
+    local slot = "o:" .. objectID
+    local current = tbl[key][slot]
+    if type(current) ~= "table" then
+        spot.shared = true
+        tbl[key][slot] = spot
+        changed = true
+        return
+    end
+    if sameSpot(current, spot) then return end
+    current.more = current.more or {}
+    for _, s in ipairs(current.more) do
+        if sameSpot(s, spot) then return end
+    end
+    if #current.more >= MAX_OBJECT_SPOTS then return end
+    current.more[#current.more + 1] = spot
+    changed = true
+end
+
+local function receive(kind, body, hash, needed)
+    if kind == "E" then
+        receiveQuestNpc("E", "questEnders", body, hash, needed)
+    elseif kind == "S" then
+        receiveQuestNpc("S", "questGivers", body, hash, needed)
+    elseif kind == "V" then
+        receiveEventSpot(body)
+    elseif kind == "I" then
+        local itemID, k, id, rest = body:match("^(%d+),([no]),(%d+),?(.*)$")
+        itemID, id = intIn(itemID, 1, 10000000), intIn(id, 1, 10000000)
+        if not (itemID and id) then return end
+        if k == "n" then
+            receiveDropFact("questDropItems", itemID, id, hash, needed, "I:" .. itemID .. ":n:" .. id)
+        else
+            local spot = parseSpot(rest)
+            if spot then receiveDropSpot("questDropItems", itemID, id, spot) end
+        end
+    elseif kind == "D" then
+        local id, name = body:match("^(%d+),(.+)$")
+        id, name = intIn(id, 1, 10000000), cleanName(name)
+        if id and name then receiveDropFact("questDropSources", name, id, hash, needed, "D:" .. name .. ":" .. id) end
+    elseif kind == "O" then
+        local id, c, x, y, name = body:match("^(%d+),(%d+),(%-?[%d%.]+),(%-?[%d%.]+),(.+)$")
+        id, name = intIn(id, 1, 10000000), cleanName(name)
+        local spot = parseSpot(c and (c .. "," .. x .. "," .. y))
+        if id and name and spot then receiveDropSpot("questDropSources", name, id, spot) end
     end
 end
 
@@ -313,9 +393,9 @@ local function onAddonMessage(prefix, text, channel, sender)
         if kind == "D" or kind == "O" then
             -- item names: only from players with the same client language
             local l, rest = body:match("^(%a%a%u%u),(.+)$")
-            if l == loc then vote(kind, rest, hash, needed) end
+            if l == loc then receive(kind, rest, hash, needed) end
         else
-            vote(kind, body, hash, needed)
+            receive(kind, body, hash, needed)
         end
     end
     if changed then
@@ -360,7 +440,7 @@ local function nextMessage()
             list[#list + 1] = { key = key, body = body }
         end
     end
-    for _, kind in ipairs({ "E", "V", "I", "O", "D" }) do
+    for _, kind in ipairs({ "E", "S", "V", "I", "O", "D" }) do
         local list = byKind[kind]
         if list then
             local head = "1" .. kind .. "|"
@@ -607,6 +687,7 @@ end)
 
 -- map marks pick up confirmed records
 DataShare.onChanged = function()
+    if ns.QuestLogPins and ns.QuestLogPins.resetNpcQuests then pcall(ns.QuestLogPins.resetNpcQuests) end
     if ns.QuestObjectivePins and ns.QuestObjectivePins.refreshAll then pcall(ns.QuestObjectivePins.refreshAll) end
     if ns.RefreshQuestLogPins then pcall(ns.RefreshQuestLogPins) end
 end
