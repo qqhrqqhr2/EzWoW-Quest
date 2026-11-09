@@ -1871,6 +1871,10 @@ function QuestObjectivePins.guideTo(questID)
         if okPoint and pointed then return true end
     end
     if not (mapID and mx and my and C_Map and C_Map.SetUserWaypoint and UiMapPoint) then return false end
+    -- quest details open on the World Map go back to the list when the game's
+    -- arrow leaves that quest: no waypoint while they are open
+    local details = _G.QuestMapFrame and _G.QuestMapFrame.DetailsFrame
+    if details and details.IsShown and details:IsShown() and WorldMapFrame and WorldMapFrame:IsShown() then return true end
     local ok = pcall(function()
         if C_Map.CanSetUserWaypointOnMap and not C_Map.CanSetUserWaypointOnMap(mapID) then error("map") end
         C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(mapID, mx, my))

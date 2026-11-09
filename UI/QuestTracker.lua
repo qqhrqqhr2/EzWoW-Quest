@@ -80,7 +80,18 @@ function ObjectiveTrackerController.resolveRGBToHex(r, g, b)
     return string.format("|cff%02x%02x%02x", math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
 end
 
-function ObjectiveTrackerController.resolveDifficultyHex(level)
+function ObjectiveTrackerController.resolveDifficultyHex(level, questID)
+    -- the same color as the game's quest list: the client's own difficulty for the quest
+    if questID and C_PlayerInfo and type(C_PlayerInfo.GetContentDifficultyQuestForPlayer) == "function"
+        and type(GetDifficultyColor) == "function" then
+        local okD, difficulty = pcall(C_PlayerInfo.GetContentDifficultyQuestForPlayer, questID)
+        if okD and difficulty ~= nil and not (issecretvalue and issecretvalue(difficulty)) then
+            local okC, c = pcall(GetDifficultyColor, difficulty)
+            if okC and type(c) == "table" and c.r then
+                return ObjectiveTrackerController.resolveRGBToHex(c.r, c.g, c.b)
+            end
+        end
+    end
     local lvVal = tonumber(level) or 0
     if lvVal <= 0 then
         return "|cffffd100"
@@ -713,6 +724,13 @@ function ObjectiveTrackerController.showQuestOverlay(line)
         return
     end
     local target = ObjectiveTrackerController.resolveQuestLogClickTarget(questData.questID)
+    -- no block of this quest in the default tracker (it only builds what fits):
+    -- the quest log button would open the map without the quest's details, so
+    -- the line's own click opens them instead
+    if target and target == _G.QuestLogMicroButton and _G.QuestMapFrame
+        and (type(QuestMapFrame_OpenToQuestDetails) == "function" or type(QuestMapFrame_ShowQuestDetails) == "function") then
+        target = nil
+    end
     if not target then
         ObjectiveTrackerController.hideQuestOverlay()
         return
@@ -783,6 +801,24 @@ end
 function ObjectiveTrackerController.isSolid(savedDB)
     if ObjectiveTrackerController.hoverActive then return true end
     return savedDB.trackerShowBg ~= false and not savedDB.trackerLocked
+end
+
+-- The quest's details in the World Map's quest list: with the map already open
+-- only the details change, as a click in the list does; else the map opens at them.
+function ObjectiveTrackerController.openQuestOnMap(questID)
+    local list = _G.QuestMapFrame
+    if not (questID and list and WorldMapFrame) then return false end
+    if WorldMapFrame:IsShown() and list:IsShown() and type(QuestMapFrame_ShowQuestDetails) == "function" then
+        if pcall(QuestMapFrame_ShowQuestDetails, questID) then return true end
+    end
+    if type(QuestMapFrame_OpenToQuestDetails) == "function" then
+        if pcall(QuestMapFrame_OpenToQuestDetails, questID) then return true end
+    end
+    if type(QuestMapFrame_ShowQuestDetails) == "function" then
+        if not WorldMapFrame:IsShown() and type(ShowUIPanel) == "function" then pcall(ShowUIPanel, WorldMapFrame) end
+        return pcall(QuestMapFrame_ShowQuestDetails, questID) and true or false
+    end
+    return false
 end
 
 function ObjectiveTrackerController.launchQuestInLog(questData)
@@ -1158,6 +1194,103 @@ function ObjectiveTrackerController.addPartyTooltipLines(questData)
     end
 end
 
+-----------------------------------------------------------------------------
+-- Quest rewards in the quest line tooltip: XP, money, items and the items to
+-- choose one from, as the quest log shows them. The quest log answers for its
+-- selected quest, so the quest is selected for the reading and the log gets
+-- its own selection back.
+-----------------------------------------------------------------------------
+local function rewardValue(v)
+    if v == nil or (issecretvalue and issecretvalue(v)) then return nil end
+    return v
+end
+
+local function rewardItemText(name, texture, count, quality, itemID)
+    name, texture = rewardValue(name), rewardValue(texture)
+    count, quality, itemID = tonumber(rewardValue(count)), tonumber(rewardValue(quality)), tonumber(rewardValue(itemID))
+    if type(name) ~= "string" or name == "" then
+        -- item data not loaded yet: asked for, shown on the next hover
+        if itemID and C_Item and type(C_Item.RequestLoadItemDataByID) == "function" then
+            pcall(C_Item.RequestLoadItemDataByID, itemID)
+        end
+        name = "..."
+    end
+    local hex = "|cffffffff"
+    local qc = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+    if qc and type(qc.hex) == "string" then hex = qc.hex end
+    local icon = (texture and texture ~= "") and ("|T" .. tostring(texture) .. ":14:14:0:0|t ") or ""
+    local countText = (count and count > 1) and (" x" .. count) or ""
+    return icon .. hex .. name .. "|r" .. countText
+end
+
+function ObjectiveTrackerController.questRewards(questID)
+    if not questID then return nil end
+    local function get(fn, ...)
+        if type(fn) ~= "function" then return nil end
+        local ok, a, b, c, d, e, f = pcall(fn, ...)
+        if not ok then return nil end
+        return a, b, c, d, e, f
+    end
+    local log = C_QuestLog
+    local before = log and rewardValue((get(log.GetSelectedQuest)))
+    local switched = false
+    if before ~= questID and log and type(log.SetSelectedQuest) == "function" then
+        switched = pcall(log.SetSelectedQuest, questID)
+    end
+
+    local rewards = { items = {}, choices = {} }
+    rewards.xp = tonumber(rewardValue((get(GetQuestLogRewardXP, questID)))) or 0
+    rewards.money = tonumber(rewardValue((get(GetQuestLogRewardMoney, questID)))) or 0
+    local numItems = tonumber(rewardValue((get(GetNumQuestLogRewards, questID)))) or 0
+    for i = 1, numItems do
+        local name, texture, count, quality, _, itemID = get(GetQuestLogRewardInfo, i, questID)
+        rewards.items[#rewards.items + 1] = rewardItemText(name, texture, count, quality, itemID)
+    end
+    local numChoices = tonumber(rewardValue((get(GetNumQuestLogChoices, questID)))) or 0
+    for i = 1, numChoices do
+        local name, texture, count, quality, _, itemID = get(GetQuestLogChoiceInfo, i)
+        rewards.choices[#rewards.choices + 1] = rewardItemText(name, texture, count, quality, itemID)
+    end
+
+    if switched and type(before) == "number" and before > 0 then
+        pcall(log.SetSelectedQuest, before)
+    end
+    return rewards
+end
+
+function ObjectiveTrackerController.addRewardTooltipLines(questData)
+    local rewards = questData and ObjectiveTrackerController.questRewards(questData.questID)
+    if not rewards then return end
+    if rewards.xp <= 0 and rewards.money <= 0 and #rewards.items == 0 and #rewards.choices == 0 then return end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(ns:L("TRACKER_TT_REWARDS"), STYLE.accent[1], STYLE.accent[2], STYLE.accent[3])
+    if rewards.xp > 0 then
+        local xpText = type(BreakUpLargeNumbers) == "function" and BreakUpLargeNumbers(rewards.xp) or tostring(rewards.xp)
+        GameTooltip:AddLine(ns:L("TRACKER_TT_REWARD_XP") .. " " .. xpText, 1, 1, 1)
+    end
+    if rewards.money > 0 then
+        local moneyText
+        if type(GetCoinTextureString) == "function" then
+            local ok, s = pcall(GetCoinTextureString, rewards.money)
+            if ok then moneyText = s end
+        end
+        if not moneyText and type(GetMoneyString) == "function" then
+            local ok, s = pcall(GetMoneyString, rewards.money, true)
+            if ok then moneyText = s end
+        end
+        if moneyText then GameTooltip:AddLine(moneyText, 1, 1, 1) end
+    end
+    for _, text in ipairs(rewards.items) do
+        GameTooltip:AddLine(text, 1, 1, 1)
+    end
+    if #rewards.choices > 0 then
+        GameTooltip:AddLine(ns:L("TRACKER_TT_REWARD_CHOICE"), STYLE.textSub[1], STYLE.textSub[2], STYLE.textSub[3])
+        for _, text in ipairs(rewards.choices) do
+            GameTooltip:AddLine("  " .. text, 1, 1, 1)
+        end
+    end
+end
+
 -- party members' quest logs change often: one tracker refresh per half second
 local partyRefreshPending = false
 function ObjectiveTrackerController.schedulePartyRefresh()
@@ -1254,7 +1387,7 @@ function ObjectiveTrackerController.acquireTrackerRowWidget(index)
             local cxVal = self:GetCenter() or 0
             local swVal = (UIParent and UIParent:GetWidth()) or 1920
             GameTooltip:SetOwner(self, cxVal < (swVal * 0.5) and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
-            local diffHex = ObjectiveTrackerController.resolveDifficultyHex(priorityQueue.level)
+            local diffHex = ObjectiveTrackerController.resolveDifficultyHex(priorityQueue.level, priorityQueue.questID)
             GameTooltip:SetText(string.format("%s[%d%s] %s|r", diffHex, priorityQueue.level or 1, priorityQueue.tagSuffix or "", priorityQueue.title or ""), 1, 1, 1)
             if priorityQueue.zoneName then
                 GameTooltip:AddLine(priorityQueue.zoneName, STYLE.accent[1], STYLE.accent[2], STYLE.accent[3])
@@ -1276,6 +1409,7 @@ function ObjectiveTrackerController.acquireTrackerRowWidget(index)
                     GameTooltip:AddLine("• " .. cHex .. (obj.text or "") .. "|r", 1, 1, 1, true)
                 end
             end
+            ObjectiveTrackerController.addRewardTooltipLines(priorityQueue)
             ObjectiveTrackerController.addPartyTooltipLines(priorityQueue)
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine(ns:L("TRACKER_TT_QUEST_LCLICK"), STYLE.text[1], STYLE.text[2], STYLE.text[3])
@@ -1959,7 +2093,7 @@ function ns:UpdateQuestTracker()
                     qLine.text:SetWidth(math.max(80, innerWidth - 24 - itemIndent))
                     qLine.text:SetFontObject(GameFontNormalSmall)
 
-                    local diffHex = presentZoneAndLevel and ObjectiveTrackerController.resolveDifficultyHex(priorityQueue.level) or "|cffffd100"
+                    local diffHex = presentZoneAndLevel and ObjectiveTrackerController.resolveDifficultyHex(priorityQueue.level, priorityQueue.questID) or "|cffffd100"
                     local lvPrefix = presentZoneAndLevel and string.format("[%d%s] ", priorityQueue.level or 1, priorityQueue.tagSuffix or "") or ""
                     local focusMark = (superTrackedID and superTrackedID == priorityQueue.questID) and "|cff7aa2f7▸ |r" or ""
                     local stateSuffix = ""
@@ -1990,10 +2124,24 @@ function ns:UpdateQuestTracker()
                                     ns.QuestShare.Share(priorityQueue.questID, priorityQueue.logIndex, false)
                                 end
                             else
-                                -- guide to the nearest place to go; the quest log when there is none
+                                -- the quest's details open on the map, then the guide to the
+                                -- nearest place to go; the quest log when there is none
                                 local qop = ns.QuestObjectivePins
-                                local guided = qop and qop.guideTo and qop.guideTo(priorityQueue.questID)
-                                if not guided then
+                                local questID = priorityQueue.questID
+                                local opened = false
+                                if not ObjectiveTrackerController.hasInCombat() then
+                                    opened = ObjectiveTrackerController.openQuestOnMap(questID)
+                                end
+                                local guided
+                                if opened then
+                                    -- the same as a click in the game's quest list: the guide
+                                    -- comes a moment after the details have opened
+                                    guided = true
+                                    if qop and qop.requestGuide then qop.requestGuide(questID) end
+                                else
+                                    guided = qop and qop.guideTo and qop.guideTo(questID)
+                                end
+                                if not guided and not opened then
                                     ObjectiveTrackerController.launchQuestInLog(priorityQueue)
                                 end
                             end
