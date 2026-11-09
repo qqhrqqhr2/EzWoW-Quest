@@ -1,13 +1,15 @@
-# v1.0.7
+# v1.0.8
 
 ### 한국어
-- 퀘스트를 완료한 NPC를 기억해서, 완료 표시(?)를 정확한 위치에 보여 줍니다.
-- 퀘스트 아이템을 주운 몬스터·오브젝트를 아이템 기준으로 기억해서 목표 위치에 표시합니다.
-- 장소에 도착하거나 정찰하는 목표의 위치를 기억해서 지도에 표시합니다.
-- 알아낸 퀘스트 위치를 파티·길드와 이 애드온을 쓰는 다른 사람과 자동으로 공유합니다. 채팅창에는 아무것도 나오지 않고, 이름은 저장하지 않으며, 여러 사람이 같은 내용을 보냈을 때만 사용합니다. 설정(/ezq)에서 끌 수 있습니다.
+- 공유 채널로 받은 퀘스트 완료 NPC가 거의 확정되지 않던 문제를 고쳤습니다. 서 있던 위치가 달라도 같은 NPC면 같은 기록으로 셉니다.
+- 정찰 지점과 오브젝트 위치는 다른 사용자가 보내면 바로 지도에 표시하고, 여러 곳이면 모두 보여 줍니다.
+- 퀘스트를 주는 NPC도 기억하고 공유해서, 받을 수 있는 퀘스트(!) 표시가 더 정확해집니다.
+- 몬스터에 마우스를 올려 알게 된 퀘스트 아이템 드롭도 다른 언어 사용자와 공유됩니다.
+- 공유받은 기록은 여러 사람이 다른 값을 보내면 더 많이 확인된 쪽으로 바뀝니다.
 
 ### English
-- Remembers the NPC you turned a quest in to and shows the turn-in mark (?) at the right place.
-- Remembers which creatures and objects quest items came from (by item) and shows them as objective spots.
-- Remembers where "reach" or "scout" objectives were completed and shows them on the map.
-- Automatically shares learned quest spots with your party, guild and other players of this addon. Nothing appears in chat, no names are stored, and shared spots are used only when several players report the same one. You can turn it off in the settings (/ezq).
+- Fixed turn-in NPCs from the shared channel hardly ever being confirmed: reports of the same NPC now count together wherever the player stood.
+- Scouting spots and object spots from other players show on the map right away, all of them when there are several.
+- Quest givers are remembered and shared too, so the "!" marks for quests you can take are more accurate.
+- Quest item drops learned by hovering creatures are shared with players of other languages too.
+- A shared record changes to another value when more players report that one.
