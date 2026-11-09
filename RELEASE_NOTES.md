@@ -1,15 +1,11 @@
-# v1.0.8
+# v1.0.9
 
 ### 한국어
-- 공유 채널로 받은 퀘스트 완료 NPC가 거의 확정되지 않던 문제를 고쳤습니다. 서 있던 위치가 달라도 같은 NPC면 같은 기록으로 셉니다.
-- 정찰 지점과 오브젝트 위치는 다른 사용자가 보내면 바로 지도에 표시하고, 여러 곳이면 모두 보여 줍니다.
-- 퀘스트를 주는 NPC도 기억하고 공유해서, 받을 수 있는 퀘스트(!) 표시가 더 정확해집니다.
-- 몬스터에 마우스를 올려 알게 된 퀘스트 아이템 드롭도 다른 언어 사용자와 공유됩니다.
-- 공유받은 기록은 여러 사람이 다른 값을 보내면 더 많이 확인된 쪽으로 바뀝니다.
+- 퀘스트 목록에서 퀘스트에 마우스를 올리면 보상(경험치·골드·아이템·선택 보상)도 보여 줍니다.
+- 퀘스트 레벨 색이 게임 퀘스트 목록과 같은 난이도 색으로 나옵니다.
+- 퀘스트를 클릭하면 세계 지도에 그 퀘스트의 상세 내용이 열린 뒤 가장 가까운 수행 위치로 안내합니다.
 
 ### English
-- Fixed turn-in NPCs from the shared channel hardly ever being confirmed: reports of the same NPC now count together wherever the player stood.
-- Scouting spots and object spots from other players show on the map right away, all of them when there are several.
-- Quest givers are remembered and shared too, so the "!" marks for quests you can take are more accurate.
-- Quest item drops learned by hovering creatures are shared with players of other languages too.
-- A shared record changes to another value when more players report that one.
+- Hovering a quest in the list now also shows its rewards (XP, money, items and the items to choose from).
+- Quest level colors now match the difficulty colors of the game's quest list.
+- Clicking a quest opens its details on the World Map, then guides you to the nearest place to go.
