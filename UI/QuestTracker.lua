@@ -727,7 +727,8 @@ function ObjectiveTrackerController.showQuestOverlay(line)
     -- no block of this quest in the default tracker (it only builds what fits):
     -- the quest log button would open the map without the quest's details, so
     -- the line's own click opens them instead
-    if target and target == _G.QuestLogMicroButton and _G.QuestMapFrame
+    -- (with the gamepad on the secure button is kept: see ns.IsGamePadUI)
+    if target and target == _G.QuestLogMicroButton and _G.QuestMapFrame and not ns.IsGamePadUI()
         and (type(QuestMapFrame_OpenToQuestDetails) == "function" or type(QuestMapFrame_ShowQuestDetails) == "function") then
         target = nil
     end
@@ -807,7 +808,7 @@ end
 -- only the details change, as a click in the list does; else the map opens at them.
 function ObjectiveTrackerController.openQuestOnMap(questID)
     local list = _G.QuestMapFrame
-    if not (questID and list and WorldMapFrame) then return false end
+    if not (questID and list and WorldMapFrame) or ns.IsGamePadUI() then return false end
     if WorldMapFrame:IsShown() and list:IsShown() and type(QuestMapFrame_ShowQuestDetails) == "function" then
         if pcall(QuestMapFrame_ShowQuestDetails, questID) then return true end
     end
@@ -831,6 +832,7 @@ function ObjectiveTrackerController.launchQuestInLog(questData)
         end
         return
     end
+    if ns.IsGamePadUI() then return end
 
     if type(QuestMapFrame_OpenToQuestDetails) == "function" and not _G.QuestLogFrame then
         pcall(QuestMapFrame_OpenToQuestDetails, questData.questID)

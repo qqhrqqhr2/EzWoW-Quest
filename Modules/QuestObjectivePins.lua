@@ -9,6 +9,9 @@
 -- dots are joined by thin lines. Quests without such spots get a hollow gold
 -- ring at the game's own quest position. The minimap shows the marks nearby.
 local _, ns = ...
+-- frames made on the World Map are made without a parent and put in after
+-- (Libs/EzWoWGamePad MakeFrame: keeps the game's gamepad cursor untainted)
+local CreateFrame = (ns.GamePad and ns.GamePad.MakeFrame) or CreateFrame
 
 -- Click pass-through can't be changed in combat: it is set once combat ends.
 local pendingPropagate = {}

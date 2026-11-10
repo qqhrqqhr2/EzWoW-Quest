@@ -97,6 +97,9 @@ function ns:InitializeDatabase()
         _G.EzWoW_QuestDB = {}
     end
     local savedDB = _G.EzWoW_QuestDB
+    -- the learned quest records live in the shared saved data of all EzWoW
+    -- addons (Libs/EzWoWShare) and are read through this table
+    if self.Share and self.Share.AttachQuestDB then self.Share.AttachQuestDB(savedDB) end
     for key, value in pairs(self.DEFAULTS) do
         if savedDB[key] == nil then
             savedDB[key] = copyValue(value)
@@ -139,6 +142,15 @@ function ns:PrintMsg(msg)
     else
         print(prefix .. tostring(msg))
     end
+end
+
+-----------------------------------------------------------------------------
+-- Gamepad UI: the World Map or quest log opened by addon code taints the
+-- game's gamepad navigation (Libs/EzWoWGamePad). With the gamepad on, only
+-- secure clicks on the game's own buttons open them.
+-----------------------------------------------------------------------------
+function ns.IsGamePadUI()
+    return ns.GamePad and ns.GamePad.IsActive() or false
 end
 
 -----------------------------------------------------------------------------

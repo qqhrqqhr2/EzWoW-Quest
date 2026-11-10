@@ -524,7 +524,8 @@ function ns:RefreshSettingsUI()
         SettingsDialog.setFittedLabel(w.chkQuestGiverPins, self:L("questGiverPins"))
         w.chkQuestGiverPins:SetChecked(savedDB.questGiverPins ~= false)
         SettingsDialog.setFittedLabel(w.chkQuestShareData, self:L("questShareData"))
-        w.chkQuestShareData:SetChecked(savedDB.questShareData ~= false)
+        -- the shared setting (Libs/EzWoWShare), also changed with /ezshare
+        w.chkQuestShareData:SetChecked(ns.DataShare and ns.DataShare.isEnabled() or false)
         w.mapNote:SetText(self:L("MAP_NEEDS_MAPFINDER"))
         SettingsDialog.syncMapOptionRows(w)
 
