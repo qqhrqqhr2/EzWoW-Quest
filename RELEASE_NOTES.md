@@ -1,11 +1,11 @@
-# v1.0.9
+# v1.0.10
 
 ### 한국어
-- 퀘스트 목록에서 퀘스트에 마우스를 올리면 보상(경험치·골드·아이템·선택 보상)도 보여 줍니다.
-- 퀘스트 레벨 색이 게임 퀘스트 목록과 같은 난이도 색으로 나옵니다.
-- 퀘스트를 클릭하면 세계 지도에 그 퀘스트의 상세 내용이 열린 뒤 가장 가까운 수행 위치로 안내합니다.
+- 게임패드를 지원합니다. 패드로 EzWoW 창을 다루고, 보기(Create) 버튼으로 화면의 EzWoW 프레임으로 이동합니다.
+- EzWoW 애드온끼리 퀘스트·희귀 몬스터·드롭·채집 기록을 공유합니다(기본 켜짐, `/ezshare`).
+- 게임패드 사용 중 퀘스트 목록에서 지도를 열 때 기능 차단 오류가 나던 문제를 수정했습니다.
 
 ### English
-- Hovering a quest in the list now also shows its rewards (XP, money, items and the items to choose from).
-- Quest level colors now match the difficulty colors of the game's quest list.
-- Clicking a quest opens its details on the World Map, then guides you to the nearest place to go.
+- Added gamepad support: EzWoW windows work with a gamepad, and View (Create) moves to the EzWoW frames on screen.
+- EzWoW addons now share quest, rare monster, drop and gathering records (on by default, `/ezshare`).
+- Fixed actions being blocked when opening the map from the quest list with a gamepad.
