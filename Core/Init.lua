@@ -229,9 +229,18 @@ function ns.MapProjector()
     return api and type(api.ProjectSpawn) == "function" and api.ProjectSpawn or nil
 end
 
-function ns.ApplyWaypointForSpawn(spawn)
+-- names the waypoint just set for the on-screen arrow (Libs/EzWoWWaypointArrow)
+function ns.SetWaypointArrowLabel(text)
+    local arrow = _G.EzWoW_WaypointArrow
+    if type(arrow) == "table" and type(arrow.SetLabel) == "function" then
+        pcall(arrow.SetLabel, text, "EzWoW - Quest")
+    end
+end
+
+-- labelText: what the on-screen arrow names
+function ns.ApplyWaypointForSpawn(spawn, labelText)
     local api = ns.MapAPI()
-    if api and type(api.ApplyWaypoint) == "function" then api.ApplyWaypoint(spawn) end
+    if api and type(api.ApplyWaypoint) == "function" then api.ApplyWaypoint(spawn, labelText or "", "EzWoW - Quest") end
 end
 
 function ns.PassMapRightClicks(frame)

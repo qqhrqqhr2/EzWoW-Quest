@@ -458,7 +458,8 @@ function QuestLogPins.obtainPin(index)
     pin:SetScript("OnClick", function(self)
         local sp = self.group and self.group.spawn
         if not sp then return end
-        ns.ApplyWaypointForSpawn(sp)
+        local quest = self.group.quests and self.group.quests[1]
+        ns.ApplyWaypointForSpawn(sp, self.group.npcName or (quest and quest.title) or "")
     end)
     ns.PassMapRightClicks(pin)
     pins[index] = pin
@@ -1194,7 +1195,12 @@ local function obtainGiverPin(index)
     pin:HookScript("OnLeave", lowerPin)
     pin:SetScript("OnClick", function(self)
         local sp = self.group and self.group.spawn
-        if sp then ns.ApplyWaypointForSpawn(sp) end
+        if sp then
+            local npcId = self.group.npcIds and self.group.npcIds[1]
+            local entry = npcId and entryByKey["npc:" .. npcId]
+            local name = entry and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(entry) or ""
+            ns.ApplyWaypointForSpawn(sp, name)
+        end
     end)
     ns.PassMapRightClicks(pin)
     giverPins[index] = pin

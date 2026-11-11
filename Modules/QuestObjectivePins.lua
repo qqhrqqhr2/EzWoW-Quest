@@ -910,7 +910,7 @@ local function showGroupTooltip(owner, group, anchor)
     if _G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.Refit then pcall(_G.EzWoWTooltipTagSizer.Refit, GameTooltip) end
 end
 
-local function setWaypointAt(mapID, x, y)
+local function setWaypointAt(mapID, x, y, labelText)
     if not ns.IsAutoWaypoint() then return end
     if not (C_Map and C_Map.SetUserWaypoint and UiMapPoint and UiMapPoint.CreateFromCoordinates) then return end
     pcall(function()
@@ -921,6 +921,7 @@ local function setWaypointAt(mapID, x, y)
             if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
                 C_SuperTrack.SetSuperTrackedUserWaypoint(true)
             end
+            ns.SetWaypointArrowLabel(labelText)
         end
     end)
 end
@@ -928,10 +929,12 @@ end
 local function onPinClick(self)
     local group = self.group
     if not group then return end
+    local item = group.items and group.items[1]
+    local labelText = (item and item.quest and item.quest.title) or ""
     if group.mapPoint then
-        setWaypointAt(group.mapPoint[1], group.mapPoint[2], group.mapPoint[3])
+        setWaypointAt(group.mapPoint[1], group.mapPoint[2], group.mapPoint[3], labelText)
     elseif group.spawn then
-        ns.ApplyWaypointForSpawn(group.spawn)
+        ns.ApplyWaypointForSpawn(group.spawn, labelText)
     end
 end
 
@@ -1871,7 +1874,10 @@ function QuestObjectivePins.guideTo(questID)
             spawns = shownSpawns,
         }
         local okPoint, pointed = pcall(api.PointAtSpawn, shown, primary)
-        if okPoint and pointed then return true end
+        if okPoint and pointed then
+            ns.SetWaypointArrowLabel(label)
+            return true
+        end
     end
     if not (mapID and mx and my and C_Map and C_Map.SetUserWaypoint and UiMapPoint) then return false end
     -- quest details open on the World Map go back to the list when the game's
@@ -1884,6 +1890,7 @@ function QuestObjectivePins.guideTo(questID)
         if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
             C_SuperTrack.SetSuperTrackedUserWaypoint(true)
         end
+        ns.SetWaypointArrowLabel(tostring(title) .. " - " .. tostring(targetName))
     end)
     return ok
 end
