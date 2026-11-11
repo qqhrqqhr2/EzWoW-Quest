@@ -20,12 +20,13 @@
 ## Notes-ruRU: Список заданий, автопринятие и сдача, лучшая награда, сообщения группе, цели и места сдачи на карте и миникарте (/ezq)
 ## Notes-zhCN: 任务追踪、自动接受/交付、最佳奖励标记、队伍进度通报，以及地图和小地图上的任务目标与交付地点 (/ezq)
 ## Notes-zhTW: 任務追蹤、自動接受/交付、最佳獎勵標記、隊伍進度通報，以及地圖和小地圖上的任務目標與交付地點 (/ezq)
+## X-License: GPL-3.0
 ## Author: qqhrqqhr2
 ## Version: 1.0.10
 ## Category: EzWoW
 ## IconTexture: Interface\AddOns\EzWoW-Quest\Media\Icon
 ## SavedVariables: EzWoW_QuestDB, EzWoW_SharedData
-## OptionalDeps: EzWoW-MapFinder, EzWoW-FrameMover
+## OptionalDeps: EzWoW-MapFinder, EzWoW-FrameMover, EzWoW-Data
 
 Libs\EzWoWGamePad\GamePad.lua
 Libs\EzWoWShare\Share.lua
@@ -33,6 +34,7 @@ Core\Locales.lua
 Core\UIKit.lua
 Core\Init.lua
 Data\QuestLevels.lua
+Data\SharedData.lua
 UI\LanguageDropdown.lua
 Modules\QuestAutomation.lua
 Modules\QuestAnnounce.lua

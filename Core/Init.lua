@@ -213,8 +213,12 @@ function ns.MapTranslations()
     return type(t) == "table" and t or nil
 end
 
+-- quest tables: the shared ones from EzWoW - Data (Data/SharedData.lua) when
+-- loaded, else Map Finder's. Both only while Map Finder is loaded, so the
+-- marks are the same with and without EzWoW - Data.
 function ns.QuestData()
     local api = ns.MapAPI()
+    if api and type(ns.SharedQuestData) == "table" then return ns.SharedQuestData end
     local q = api and type(api.GetQuestData) == "function" and api.GetQuestData()
     return type(q) == "table" and q or nil
 end

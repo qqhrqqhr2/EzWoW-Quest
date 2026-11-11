@@ -1337,6 +1337,7 @@ end
 function ObjectiveTrackerController.acquireTrackerRowWidget(index)
     local line = linePool[index]
     if line then
+        line.objIndex = nil
         line:Show()
         return line
     end
@@ -1899,6 +1900,27 @@ function ObjectiveTrackerController.prepareTrackerFrame()
     return trackerFrame
 end
 
+-- In combat the list is not laid out again (it can be protected); only the
+-- objective lines already shown get their new text ("2/3" -> "3/3").
+function ObjectiveTrackerController.refreshObjectiveTexts()
+    local byQuest = {}
+    for _, line in ipairs(linePool) do
+        local q = line.questData
+        if line.objIndex and q and q.questID and line.text and line:IsShown() then
+            local list = byQuest[q.questID]
+            if not list then
+                list = ObjectiveTrackerController.resolveQuestObjectivesSafe(q.questID, q.logIndex)
+                byQuest[q.questID] = list
+            end
+            local obj = list[line.objIndex]
+            if obj then
+                local cHex = ObjectiveTrackerController.resolveObjectiveProgressHex(obj.numFulfilled, obj.numRequired, obj.finished or q.isComplete == 1)
+                line.text:SetText(cHex .. "• " .. (obj.text or "") .. "|r")
+            end
+        end
+    end
+end
+
 function ns:UpdateQuestTracker()
     local savedDB = self:InitializeDatabase()
     self:ApplyDefaultTrackerVisibility()
@@ -1906,6 +1928,8 @@ function ns:UpdateQuestTracker()
     -- secure quest-item buttons make the tracker (implicitly) protected: Show/Hide/SetSize/SetHeight
     -- would be blocked in combat, so relayout after PLAYER_REGEN_ENABLED instead
     if trackerFrame and ObjectiveTrackerController.hasInCombat() and trackerFrame:IsProtected() then
+        -- the text itself can still change: progress counts stay current
+        ObjectiveTrackerController.refreshObjectiveTexts()
         return
     end
 
@@ -2195,10 +2219,11 @@ function ns:UpdateQuestTracker()
                             fLine:SetScript("OnClick", onQuestOrObjClick)
                             yOffset = yOffset - fhVal - 1
                         else
-                            for _, obj in ipairs(priorityQueue.objectives) do
+                            for objIndex, obj in ipairs(priorityQueue.objectives) do
                                 lineIdx = lineIdx + 1
                                 local oLine = ObjectiveTrackerController.acquireTrackerRowWidget(lineIdx)
                                 oLine.questData = priorityQueue
+                                oLine.objIndex = objIndex
                                 oLine.badgeBtn:Hide()
                                 oLine:ClearAllPoints()
                                 oLine:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", LINE_PADDING_X + 13 + itemIndent, yOffset)
