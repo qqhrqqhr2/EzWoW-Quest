@@ -27,7 +27,7 @@ end
 
 -- map marks pick up records confirmed by other players
 local function onChanged(kinds)
-    if type(kinds) == "table" and not kinds.quest then return end
+    if type(kinds) == "table" and not (kinds.quest or kinds.Q) then return end
     if ns.QuestLogPins and ns.QuestLogPins.resetNpcQuests then pcall(ns.QuestLogPins.resetNpcQuests) end
     if ns.QuestObjectivePins and ns.QuestObjectivePins.refreshAll then pcall(ns.QuestObjectivePins.refreshAll) end
     if ns.RefreshQuestLogPins then pcall(ns.RefreshQuestLogPins) end

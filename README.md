@@ -62,14 +62,21 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 
 #### 받을 수 있는 퀘스트 (`!`)
 
-- 진영·직업·종족·전문 기술·레벨이 맞고, 앞 단계 퀘스트를 마친 퀘스트만 표시합니다. 이미 끝냈거나 퀘스트 목록에 있는 퀘스트는 빠집니다.
+- 진영·종족·직업·전문 기술(숙련도 포함)이 맞는 퀘스트만 표시합니다. 이미 끝냈거나 퀘스트 목록에 있는 퀘스트, 같이 할 수 없는 퀘스트를 이미 고른 경우는 빠집니다.
+- 지금 받을 수 있는 퀘스트는 노란 `!`, 아래 경우는 회색 `!`로 표시합니다.
+  - `[선행]`: 앞 단계 퀘스트를 먼저 해야 함
+  - `[조건]`: 평판·특수 조건·이벤트 NPC처럼 애드온이 미리 확인할 수 없는 조건이 있음
+  - "Lv.N부터" / "숙련도 N부터": 레벨이나 전문 기술 숙련도가 모자람
+- 아이템으로 시작하는 퀘스트는 그 퀘스트를 완료하는 NPC에게 "주는 퀘스트"로 보이지 않습니다.
+- NPC에게 말을 걸면 게임이 실제로 주는 퀘스트 목록과 비교합니다. 데이터에는 있지만 주지 않은 퀘스트는 그 캐릭터에서 숨기고, 레벨이 오르면 다시 보여 줍니다.
 - 명절·이벤트·기부·전장 퀘스트와 너무 낮은 레벨(게임에서 회색으로 나오는) 퀘스트는 표시하지 않습니다.
 - 퀘스트 레벨은 WoW Forever 서버 기준입니다.
-- **NPC 툴팁과 미니맵 툴팁**에도 그 NPC에게서 받을 수 있는 퀘스트(노란 `!`, 몇 레벨 뒤에 받을 수 있는 퀘스트는 회색으로 "Lv.N부터")와 그 NPC에게 보고할 퀘스트(초록 `?`, "보고")가 나옵니다.
+- **NPC 툴팁과 미니맵 툴팁**에도 그 NPC에게서 받을 수 있는 퀘스트와 그 NPC에게 보고할 퀘스트(초록 `?`, "보고")가 나옵니다.
 
 #### 알아낸 퀘스트 위치와 공유
 
 - 퀘스트를 주고받는 NPC, 퀘스트 아이템이 나온 몬스터·오브젝트, 도착·정찰 목표를 마친 곳을 기억해서 지도에 보여 줍니다.
+- NPC에게 말을 걸었을 때 그 NPC가 준 퀘스트와 주지 않은 퀘스트도 종족·직업과 함께 공유합니다. 다른 사람이 받은 퀘스트는 데이터에 없어도 그 NPC의 `!`로 나오고, 데이터에 없는 NPC는 위치도 함께 공유됩니다. 내 종족·직업에게 주지 않았다는 기록이 쌓이면 `[조건]`으로 표시합니다.
 - 이 기록을 파티·길드와 이 애드온을 쓰는 다른 사람과 자동으로 공유합니다(애드온 메시지만 쓰고 채팅창에는 아무것도 나오지 않으며, 이름은 저장하지 않습니다). 공유 채널로 받은 퀘스트 NPC·몬스터 드롭은 여러 사람이 같은 내용을 보냈을 때 쓰고, 위치(정찰 지점, 오브젝트)는 받는 대로 씁니다.
 - 이를 위해 숨은 채널에 들어갑니다. 내 채널 번호가 바뀌지 않도록 높은 번호(10번 이상)를 씁니다. 같은 채널 사람끼리는 채널 목록에서 캐릭터 이름이 보입니다.
 - 설정에서 끌 수 있습니다("알아낸 퀘스트 위치를 다른 EzWoW 사용자와 공유").
@@ -218,14 +225,21 @@ Hover a dot, question mark or exclamation mark on the map to see the quest and o
 
 #### Quests you can take (`!`)
 
-- Only quests that match your side, class, race, profession and level, with the earlier quests in the chain done. Quests you have finished or that are in your log are left out.
+- Only quests that match your side, race, class and profession (with its rank). Quests you have finished, that are in your log, or that another quest you took rules out are left out.
+- Quests you can take now get a yellow `!`; these get a grey one:
+  - `[Prereq.]`: an earlier quest comes first
+  - `[Cond.]`: a requirement the addon can't check (reputation, a special condition, an event NPC)
+  - "from Lv.N" / "skill N+": your level or profession rank is too low
+- A quest that starts from an item is not listed as handed out by the NPC you turn it in to.
+- Talking to an NPC compares with the quests the game really offers. A quest in the data that the NPC did not offer is hidden for that character until it levels up.
 - Holiday, event, donation and battleground quests, and low-level quests (grey in the game), are not shown.
 - Quest levels follow the WoW Forever server.
-- **NPC and minimap tooltips** also list the quests that NPC gives (yellow `!`; quests a few levels away in grey with "from Lv.N") and the finished quests to hand in there (green `?`, "hand in").
+- **NPC and minimap tooltips** also list the quests that NPC gives and the finished quests to hand in there (green `?`, "hand in").
 
 #### Learned and shared quest spots
 
 - Remembers who gives and takes in your quests, which creatures and objects quest items come from, and where "reach" / "scout" objectives are done, and shows them on the map.
+- What an NPC offered or did not offer when you talked to it is shared too, with your race and class. Quests others were offered show on that NPC's `!` even when the data lacks them, and NPCs the data lacks are shared with their spot. Reports that your race or class was not offered a quest mark it `[Cond.]`.
 - Shares them with your party, guild and other players of this addon automatically (addon messages only, nothing appears in chat, no names are stored). Quest NPCs and creature drops from the shared channel are used once several players report the same; places (scouting spots, looted objects) are used as they arrive.
 - For this the addon joins a hidden channel with a high number (10 or higher), so your own channel numbers stay the same. Players in that channel can see each other's character names in the channel list.
 - Can be turned off in the settings ("Share learned quest spots with other EzWoW users").

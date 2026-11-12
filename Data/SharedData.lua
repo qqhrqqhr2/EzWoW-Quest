@@ -53,6 +53,10 @@ local function useShared()
     if isOk and type(m) == "table" and m.formatVersion == FORMAT_VERSION
         and type(m.levels) == "table" and next(m.levels) ~= nil then
         ns.QuestLevels = m.levels
+        -- who may take a quest (race, class, profession): read before Map Finder's copy
+        if type(m.requirements) == "table" and next(m.requirements) ~= nil then
+            ns.SharedQuestRequirements = m.requirements
+        end
     end
     -- quest map tables: only when another addon (Map Finder) loads them
     pcall(D.OnModuleLoaded, "QuestMap", function(_, module) useQuestMap(module) end)

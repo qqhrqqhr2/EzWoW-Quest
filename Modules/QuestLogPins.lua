@@ -213,6 +213,13 @@ function QuestLogPins.turnInSpawns(entry)
     local cached = turnInCache[entry]
     if cached then return cached end
     local spawns = entry.spawns
+    -- flags 1 on a quest: nobody hands it out (it starts from an item), so
+    -- every spot is where it is turned in
+    if entry.kind == "quest" and type(entry.flags) == "number" and entry.flags % 2 == 1 then
+        cached = { spawns = spawns, sure = true, noGiver = true }
+        turnInCache[entry] = cached
+        return cached
+    end
     local n = #spawns
     local result = spawns
     if n >= 2 and n % 2 == 0 then
@@ -264,6 +271,125 @@ local function turnedInSet(create)
     end
     return set
 end
+
+-- Quests the data says an NPC gives, but which that NPC did not offer this
+-- character when it last talked to them (changed or hidden requirements on
+-- this server). [questID] = character level then; shown again after a level up.
+local function notOfferedSet(create)
+    if not ns.DB then return nil end
+    local guid = UnitGUID and UnitGUID("player")
+    if type(guid) ~= "string" or isSecret(guid) then return nil end
+    if type(ns.DB.questNotOffered) ~= "table" then
+        if not create then return nil end
+        ns.DB.questNotOffered = {}
+    end
+    local set = ns.DB.questNotOffered[guid]
+    if not set and create then
+        set = {}
+        ns.DB.questNotOffered[guid] = set
+    end
+    return set
+end
+
+-- What NPCs offered when players talked to them, shared between EzWoW users
+-- (shared record kind "Q", registered below): store["npcID:questID"] =
+--   { own = { state, level, raceID, classID }, peers = { [sender] = { state, raceID, classID } },
+--     spot = { continent, x, y, 0 } where the NPC stood (only for NPCs the data lacks) }
+-- state 1: the NPC offered the quest; 0: it did not, though the player met
+-- every requirement this addon knows of. Each addon decides what to show
+-- (questConditional): an offer adds the NPC as a giver; "not offered" to
+-- players of this race / class, or to two players with no offer at all,
+-- marks the quest [condition].
+local OFFER_KIND = "Q"
+local MAX_OFFER_PEERS = 20
+local OFFER_NEEDED = 2
+
+local function offerStore()
+    local s = ns.Share
+    if not (s and type(s.Store) == "function") then return nil end
+    local ok, store = pcall(s.Store, OFFER_KIND)
+    return ok and type(store) == "table" and store or nil
+end
+
+-- every vote on one NPC and quest: { state, raceID, classID } (this player's own included)
+local function offerVoteList(npcId, questID)
+    local store = offerStore()
+    local row = store and store[npcId .. ":" .. questID]
+    local out = {}
+    if type(row) ~= "table" then return out end
+    if type(row.own) == "table" and (row.own[1] == 0 or row.own[1] == 1) then
+        out[#out + 1] = { row.own[1], row.own[3], row.own[4] }
+    end
+    for _, v in pairs(type(row.peers) == "table" and row.peers or {}) do
+        if type(v) == "table" and (v[1] == 0 or v[1] == 1) then out[#out + 1] = v
+        elseif v == 0 or v == 1 then out[#out + 1] = { v } end
+    end
+    return out
+end
+
+-- offered, notOffered: how many players saw each
+local function offerVotes(npcId, questID)
+    local yes, no = 0, 0
+    for _, v in ipairs(offerVoteList(npcId, questID)) do
+        if v[1] == 1 then yes = yes + 1 else no = no + 1 end
+    end
+    return yes, no
+end
+
+-- true when the votes say this character probably can't take it there
+local function offerSaysNo(npcId, questID, me)
+    local mine = { yes = 0, no = 0 }
+    local race, class = { yes = 0, no = 0 }, { yes = 0, no = 0 }
+    local all = { yes = 0, no = 0 }
+    for _, v in ipairs(offerVoteList(npcId, questID)) do
+        local k = v[1] == 1 and "yes" or "no"
+        all[k] = all[k] + 1
+        local sameRace = me and me.raceID and v[2] == me.raceID
+        local sameClass = me and me.classID and v[3] == me.classID
+        if sameRace then race[k] = race[k] + 1 end
+        if sameClass then class[k] = class[k] + 1 end
+        if sameRace and sameClass then mine[k] = mine[k] + 1 end
+    end
+    if mine.yes > 0 then return false end
+    if mine.no > 0 then return true end
+    if all.yes == 0 and all.no >= OFFER_NEEDED then return true end
+    -- offered to others, not to this race or class: a limit the data lacks
+    if all.yes > 0 and race.yes == 0 and race.no >= OFFER_NEEDED then return true end
+    if all.yes > 0 and class.yes == 0 and class.no >= OFFER_NEEDED then return true end
+    return false
+end
+
+local function noteOwnOffer(npcId, questID, state, me, spot)
+    local store = offerStore()
+    if not store then return false end
+    local key = npcId .. ":" .. questID
+    local row = type(store[key]) == "table" and store[key] or {}
+    store[key] = row
+    if spot and not row.spot then row.spot = spot; row.ownSpot = true end
+    local old = row.own
+    if type(old) == "table" and old[1] == state and old[2] == me.level then return false end
+    row.own = { state, me.level, me.raceID or 0, me.classID or 0 }
+    return true
+end
+
+-- where the player stands, as a data spot { continent, x, y, 0 } (nil inside instances)
+local function playerSpot()
+    if not (C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition and C_Map.GetWorldPosFromMapPos) then
+        return nil
+    end
+    local okMap, mapID = pcall(C_Map.GetBestMapForUnit, "player")
+    if not okMap or type(mapID) ~= "number" or isSecret(mapID) then return nil end
+    local okPos, pos = pcall(C_Map.GetPlayerMapPosition, mapID, "player")
+    if not okPos or not pos then return nil end
+    local okWorld, continent, world = pcall(C_Map.GetWorldPosFromMapPos, mapID, pos)
+    if not okWorld or type(continent) ~= "number" or isSecret(continent) or type(world) ~= "table" then return nil end
+    local x, y = world.x, world.y
+    if type(x) ~= "number" or type(y) ~= "number" or isSecret(x) or isSecret(y) then return nil end
+    return { continent, math.floor(x * 10 + 0.5) / 10, math.floor(y * 10 + 0.5) / 10, 0 }
+end
+
+-- NPC ID -> spot, for quest givers seen in the game that the data has no spot for
+local offerNpcSpots = {}
 
 local function guidToStarter(guid)
     if type(guid) ~= "string" or isSecret(guid) then return nil end
@@ -698,7 +824,9 @@ local function buildNpcQuests()
             local info = QuestLogPins.turnInSpawns(entry)
             local givers, takers = spawns, spawns
             local n, t = #spawns, #info.spawns
-            if info.sure and t < n then
+            if info.noGiver then
+                givers = {}
+            elseif info.sure and t < n then
                 givers = {}
                 for i = 1, n - t do givers[i] = spawns[i] end
                 takers = info.spawns
@@ -733,6 +861,27 @@ local function buildNpcQuests()
         local npcId = type(rec) == "table" and type(rec.key) == "string" and tonumber(rec.key:match("^npc:(%d+)$"))
         if type(questID) == "number" and npcId then setAdd(npcGives, npcId, questID) end
     end
+    -- quests an NPC was seen offering (this player or others)
+    offerNpcSpots = {}
+    for key, row in pairs(offerStore() or {}) do
+        local npcId, questID = tostring(key):match("^(%d+):(%d+)$")
+        npcId, questID = tonumber(npcId), tonumber(questID)
+        if npcId and questID and (offerVotes(npcId, questID)) > 0 then
+            setAdd(npcGives, npcId, questID)
+            if type(row) == "table" and type(row.spot) == "table" and not entryByKey["npc:" .. npcId] then
+                offerNpcSpots[npcId] = row.spot
+            end
+        end
+    end
+end
+
+-- a quest with a condition the addon can't check: marked in the data, or not
+-- offered to players who met everything known (and never seen offered)
+local function questConditional(questID, npcId, me)
+    local entry = questIndex and questIndex[questID]
+    if entry and type(entry.flags) == "number" and math.floor(entry.flags / 2) % 2 == 1 then return true end
+    if npcId and offerSaysNo(npcId, questID, me) then return true end
+    return false
 end
 
 -- Quest NPCs near the player, by name. The minimap tooltip only has names, and
@@ -918,13 +1067,31 @@ local function questInfo(questID)
 end
 
 -- false when the quest is for the other side or another class / race
+local function requirementsOf(questID)
+    local all = ns.QuestRequirements and ns.QuestRequirements()
+    local r = all and all[questID]
+    return type(r) == "table" and r or nil
+end
+
+local function maskHas(mask, b)
+    if not (mask and mask > 0 and b and bit and bit.band) then return true end
+    return bit.band(mask, b) ~= 0
+end
+
 local function questForMe(questID, me)
+    local req = requirementsOf(questID)
+    if req then
+        if not maskHas(tonumber(req[1]), me.raceBit) then return false end
+        if not maskHas(tonumber(req[2]), me.classBit) then return false end
+    end
     local q = questInfo(questID)
     if not q then return true end
-    if q.side == 1 and me.faction == "Horde" then return false end
-    if q.side == 2 and me.faction == "Alliance" then return false end
-    if q.classMask and q.classMask > 0 and me.classBit and bit and bit.band
-        and bit.band(q.classMask, me.classBit) == 0 then return false end
+    if not req then
+        if q.side == 1 and me.faction == "Horde" then return false end
+        if q.side == 2 and me.faction == "Alliance" then return false end
+        if q.classMask and q.classMask > 0 and me.classBit and bit and bit.band
+            and bit.band(q.classMask, me.classBit) == 0 then return false end
+    end
     if q.races and me.raceBit and bit and bit.band and bit.band(q.races, me.raceBit) == 0 then return false end
     return true
 end
@@ -944,7 +1111,39 @@ local function requirementMet(need, me)
     return not anyForMe
 end
 
-local function prerequisitesMet(q, me)
+-- false when another quest that rules this one out was taken (it can never
+-- be taken then)
+local function notBlocked(q, questID)
+    local req = requirementsOf(questID)
+    for _, list in ipairs({ q and q.blockedBy, req and req[8] }) do
+        if type(list) == "table" then
+            for _, id in ipairs(list) do
+                if questDone(id) or questInLog(id) then return false end
+            end
+        end
+    end
+    return true
+end
+
+-- false while an earlier quest still has to be done (or be in the log)
+local function prerequisitesMet(q, me, questID)
+    local req = requirementsOf(questID)
+    if req then
+        if type(req[5]) == "table" then
+            for _, id in ipairs(req[5]) do
+                if not requirementMet(id, me) then return false end
+            end
+        end
+        if type(req[6]) == "table" and #req[6] > 0 and not requirementMet(req[6], me) then return false end
+        if type(req[7]) == "table" and #req[7] > 0 then
+            local any = false
+            for _, id in ipairs(req[7]) do
+                if questInLog(id) then any = true; break end
+            end
+            if not any then return false end
+        end
+    end
+    if not q then return true end
     if type(q.needDone) == "table" then
         for _, need in ipairs(q.needDone) do
             if not requirementMet(need, me) then return false end
@@ -958,29 +1157,51 @@ local function prerequisitesMet(q, me)
         end
         if not any then return false end
     end
-    if type(q.blockedBy) == "table" then
-        for _, id in ipairs(q.blockedBy) do
-            if questDone(id) or questInLog(id) then return false end
-        end
-    end
     return true
 end
 
-local function takeable(questID, me)
+local function takeable(questID, me, ignoreNotOffered)
     if questDone(questID) or questInLog(questID) then return nil end
+    if not ignoreNotOffered then
+        local notOffered = notOfferedSet()
+        local seenAt = notOffered and tonumber(notOffered[questID])
+        if seenAt and seenAt >= (me.level or 0) then return nil end
+    end
     local q = questInfo(questID)
     if specialQuest(questID, q) then return nil end
+    if not questForMe(questID, me) then return nil end
+    if not q and not notBlocked(nil, questID) then return nil end
     if q then
-        if not questForMe(questID, me) then return nil end
         local skill = PROFESSION_SORTS[q.sort or 0] or PROFESSION_SORTS[q.cat or 0]
         if skill and me.skills and not me.skills[skill] then return nil end
+        local req = requirementsOf(questID)
+        local reqSkill = req and tonumber(req[3]) or 0
+        if reqSkill > 0 and me.skills then
+            local have = me.skills[reqSkill]
+            if not have then return nil end
+            local need = tonumber(req[4]) or 0
+            if type(have) == "number" and need > have then
+                local copy = {}
+                for k, v in pairs(q) do copy[k] = v end
+                copy.needRank = need
+                q = copy
+            end
+        end
         local class = CLASS_SORTS[q.sort or 0]
         if class and class ~= me.class then return nil end
         if (q.min or 0) > me.level + LEVEL_AHEAD then return nil end
-        if not prerequisitesMet(q, me) then return nil end
+        if not notBlocked(q, questID) then return nil end
     end
+    -- an earlier quest still to do: listed as [prereq], not hidden
+    local needPrev = not prerequisitesMet(q, me, questID)
     local prev = prevQuest[questID]
-    if prev and not questDone(prev) then return nil end
+    if prev and not questDone(prev) then needPrev = true end
+    if needPrev then
+        local copy = {}
+        for k, v in pairs(q or {}) do copy[k] = v end
+        copy.needPrev = true
+        return copy
+    end
     return q or {}
 end
 
@@ -998,13 +1219,17 @@ local function playerInfo()
             for i = 2, 7 do   -- primary 1, primary 2, archaeology, fishing, cooking, first aid (any may be nil)
                 local index = results[i]
                 if type(index) == "number" then
-                    local okInfo, _, _, _, _, _, _, skillLine = pcall(GetProfessionInfo, index)
-                    if okInfo and type(skillLine) == "number" then skills[skillLine] = true end
+                    local okInfo, _, _, rank, _, _, _, skillLine = pcall(GetProfessionInfo, index)
+                    if okInfo and type(skillLine) == "number" then
+                        skills[skillLine] = (type(rank) == "number" and not isSecret(rank) and rank) or true
+                    end
                 end
             end
         end
     end
     return { level = tonumber(level) or 1, class = class, faction = faction, skills = skills,
+        raceID = (type(raceID) == "number" and not isSecret(raceID)) and raceID or nil,
+        classID = (type(classID) == "number" and not isSecret(classID)) and classID or nil,
         classBit = (type(classID) == "number" and classID >= 1 and classID <= 31) and 2 ^ (classID - 1) or nil,
         raceBit = (type(raceID) == "number" and raceID >= 1 and raceID <= 31) and 2 ^ (raceID - 1) or nil }
 end
@@ -1044,14 +1269,22 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
         local q = takeable(questID, me)
         local level = q and tonumber(q.lvl) or 0
         if q and (level <= 0 or level > floorLevel)
-            and not (nowOnly and not (QuestLogPins.takeNow and QuestLogPins.takeNow(q, me, floorLevel))) then
+            and not (nowOnly and not (q.needPrev or q.needRank or (QuestLogPins.takeNow and QuestLogPins.takeNow(q, me, floorLevel)))) then
             local name = questName(questID)
-            local tooHigh = (q.min or 0) > me.level
+            -- an earlier quest still to do: greyed like a quest above your level
+            local tooHigh = (q.min or 0) > me.level or q.needPrev == true or q.needRank ~= nil
             local known = level > 0
             local prefix = known and ("[" .. level .. "] ") or ""
             local again = repeatDone(questID)
+            -- a condition the addon can't check (reputation, a script, an event
+            -- NPC...): shown, but marked
+            if questConditional(questID, npcId, me) then
+                name = ns:L("NPC_TT_CONDITION") .. " " .. name
+            end
+            if q.needPrev then name = ns:L("NPC_TT_PREREQ") .. " " .. name end
             local text = (again and "? " or "! ") .. prefix .. name
-            if tooHigh then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_LEVEL"), q.min) .. ")" end
+            if (q.min or 0) > me.level then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_LEVEL"), q.min) .. ")" end
+            if q.needRank then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_SKILL"), q.needRank) .. ")" end
             if not sameName[text] then
                 sameName[text] = true
                 -- yellow: can take now · pale yellow: level not known · grey: later
@@ -1093,13 +1326,157 @@ function QuestLogPins.resetNpcQuests()
     giverSpotsByMap = {}
 end
 
+-- When the player talks to an NPC, the game lists the quests it offers now.
+-- A quest the data gives to that NPC, which this character could take by the
+-- data, but which is not in that list is remembered as not offered (see
+-- notOfferedSet); one offered again is forgotten.
+local function plainValue(v)
+    if v == nil or isSecret(v) then return nil end
+    return v
+end
+
+function QuestLogPins.noteOffered(npcId, offeredIDs, offeredTitles)
+    if not npcId then return end
+    buildNpcQuests()
+    local me = playerInfo()
+    local changed = false
+    -- every quest the NPC offered is shared (also ones the data doesn't know,
+    -- from NPCs it has no quests for); an NPC the data has no spot for is
+    -- shared with where it stands
+    local known = entryByKey and entryByKey["npc:" .. npcId]
+    local spot = not known and playerSpot() or nil
+    for questID in pairs(offeredIDs) do
+        if type(questID) == "number" and noteOwnOffer(npcId, questID, 1, me, spot) then changed = true end
+    end
+    local gives = npcGives and npcGives[npcId]
+    local set = notOfferedSet(true)
+    for questID in pairs(gives and set and gives or {}) do
+        local q = takeable(questID, me, true)
+        local offered = offeredIDs[questID] or offeredTitles[questName(questID)]
+        if offered then
+            if set[questID] then set[questID] = nil; changed = true end
+            if noteOwnOffer(npcId, questID, 1, me, spot) then changed = true end
+        elseif q and not q.needPrev and not q.needRank and (tonumber(q.min) or 0) <= me.level then
+            if set[questID] ~= me.level then set[questID] = me.level; changed = true end
+            if noteOwnOffer(npcId, questID, 0, me, spot) then changed = true end
+        end
+    end
+    if changed then QuestLogPins.resetNpcQuests() end
+    if changed and ns.RefreshQuestLogPins then pcall(ns.RefreshQuestLogPins) end
+end
+
+local function talkingNpcId()
+    local guid = plainValue(UnitGUID and UnitGUID("npc"))
+    local key = guid and guidToStarter(guid)
+    local id = key and key:match("^npc:(%d+)$")
+    return tonumber(id)
+end
+
+-- shared record kind "Q": "npcID,questID,state,level,raceID,classID[,continent,x,y]"
+-- (state 1 offered, 0 not; the spot only for an NPC the data has no spot for)
+if ns.Share and type(ns.Share.RegisterKind) == "function" then
+    ns.Share.RegisterKind(OFFER_KIND, {
+        own = function()
+            local out = {}
+            for key, row in pairs(offerStore() or {}) do
+                local own = type(row) == "table" and row.own
+                local npcId, questID = tostring(key):match("^(%d+):(%d+)$")
+                if npcId and type(own) == "table" and (own[1] == 0 or own[1] == 1) then
+                    local body = string.format("%d,%d,%d,%d,%d,%d", tonumber(npcId), tonumber(questID), own[1],
+                        tonumber(own[2]) or 0, tonumber(own[3]) or 0, tonumber(own[4]) or 0)
+                    local sp = row.ownSpot and row.spot
+                    if type(sp) == "table" and tonumber(sp[1]) and tonumber(sp[2]) and tonumber(sp[3]) then
+                        body = body .. string.format(",%d,%.1f,%.1f", sp[1], sp[2], sp[3])
+                    end
+                    out[#out + 1] = body
+                end
+            end
+            return out
+        end,
+        receive = function(body, hash)
+            local npcId, questID, state, level, rest = body:match("^(%d+),(%d+),([01]),(%d+),?(.*)$")
+            npcId, questID, state, level = tonumber(npcId), tonumber(questID), tonumber(state), tonumber(level)
+            if not (npcId and questID and state and level) or npcId < 1 or npcId > 10000000
+                or questID < 1 or questID > 1000000 or level > 200 then return false end
+            local raceID, classID, cont, x, y = (rest or ""):match("^(%d+),(%d+),?(%-?%d*),?(%-?[%d%.]*),?(%-?[%d%.]*)$")
+            raceID, classID = tonumber(raceID) or 0, tonumber(classID) or 0
+            if raceID > 100 or classID > 100 then return false end
+            cont, x, y = tonumber(cont), tonumber(x), tonumber(y)
+            local spot = (cont and x and y and cont >= 0 and cont < 10000 and math.abs(x) < 100000 and math.abs(y) < 100000)
+                and { cont, x, y, 0 } or nil
+            local store = offerStore()
+            if not store then return false end
+            local key = npcId .. ":" .. questID
+            local row = type(store[key]) == "table" and store[key] or {}
+            store[key] = row
+            row.peers = type(row.peers) == "table" and row.peers or {}
+            local h = tostring(hash or "?")
+            if row.peers[h] == nil then
+                local n = 0
+                for _ in pairs(row.peers) do n = n + 1 end
+                if n >= MAX_OFFER_PEERS then return false end
+            elseif type(row.peers[h]) == "table" and row.peers[h][1] == state then
+                return false
+            end
+            row.peers[h] = { state, raceID, classID }
+            if spot and not row.spot then row.spot = spot end
+            return true
+        end,
+    })
+end
+
+local offerEvents = CreateFrame("Frame")
+local listSeenAt, listNpc = -100, nil
+offerEvents:SetScript("OnEvent", function(_, event)
+    local ok = pcall(function()
+        local npcId = talkingNpcId()
+        if not npcId then return end
+        local ids, titles = {}, {}
+        if event == "GOSSIP_SHOW" then
+            local gossip = C_GossipInfo
+            if type(gossip) ~= "table" or type(gossip.GetAvailableQuests) ~= "function" then return end
+            listSeenAt, listNpc = GetTime(), npcId
+            for _, info in ipairs(gossip.GetAvailableQuests() or {}) do
+                local id = type(info) == "table" and plainValue(info.questID)
+                if type(id) == "number" then ids[id] = true end
+                local title = type(info) == "table" and plainValue(info.title)
+                if type(title) == "string" then titles[title] = true end
+            end
+        elseif event == "QUEST_GREETING" then
+            if type(GetNumAvailableQuests) ~= "function" or type(GetAvailableTitle) ~= "function" then return end
+            listSeenAt, listNpc = GetTime(), npcId
+            for i = 1, (plainValue(GetNumAvailableQuests()) or 0) do
+                local title = plainValue(GetAvailableTitle(i))
+                if type(title) == "string" then titles[title] = true end
+            end
+        elseif event == "QUEST_DETAIL" then
+            -- straight to one quest (no list first): that NPC offers only it;
+            -- picked from this NPC's list a moment ago: not the whole offer
+            if listNpc == npcId and GetTime() - listSeenAt < 60 then return end
+            local id = type(GetQuestID) == "function" and plainValue(GetQuestID())
+            if type(id) ~= "number" or id <= 0 then return end
+            ids[id] = true
+        elseif event == "QUEST_PROGRESS" or event == "QUEST_COMPLETE" then
+            -- straight to a quest being handed in (no list first): the NPC
+            -- has no quest to offer now, or the game would list them first
+            if listNpc == npcId and GetTime() - listSeenAt < 60 then return end
+        end
+        QuestLogPins.noteOffered(npcId, ids, titles)
+    end)
+    if not ok then return end
+end)
+for _, event in ipairs({ "GOSSIP_SHOW", "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE" }) do
+    pcall(offerEvents.RegisterEvent, offerEvents, event)
+end
+
 local function giverSpotsFor(mapID, project)
     local cached = giverSpotsByMap[mapID]
     if cached then return cached end
     cached = {}
     for npcId in pairs(npcGives) do
         local entry = entryByKey["npc:" .. npcId]
-        for _, sp in ipairs(entry and entry.spawns or {}) do
+        local spawns = entry and entry.spawns or (offerNpcSpots[npcId] and { offerNpcSpots[npcId] }) or {}
+        for _, sp in ipairs(spawns) do
             local mapID2, mx, my = project(sp, mapID)
             if mx and my and mapID2 == mapID then
                 cached[#cached + 1] = { npcId = npcId, sp = sp, mx = mx, my = my }
@@ -1128,6 +1505,7 @@ QuestLogPins.trivialFloor = trivialBelow
 local STATE_RANK = { now = 3, ["repeat"] = 2.5, unknown = 2, soon = 1 }
 
 local function takeNow(q, me, floorLevel)
+    if q and (q.needPrev or q.needRank) then return false end
     local lvl = q and tonumber(q.lvl)
     return lvl and lvl > 0 and q.min and lvl > floorLevel and q.min <= me.level or false
 end
@@ -1137,9 +1515,17 @@ local function giverState(npcId, me)
     local floorLevel = trivialBelow(me.level)
     local state
     for questID in pairs(npcGives[npcId] or {}) do
-        if takeNow(takeable(questID, me), me, floorLevel) then
+        local q = takeable(questID, me)
+        if takeNow(q, me, floorLevel) and questConditional(questID, npcId, me) then
+            -- [condition] quests (reputation, a script, an event NPC): grey "!"
+            if not state then state = "soon" end
+        elseif takeNow(q, me, floorLevel) then
             if not repeatDone(questID) then return "now" end
             state = "repeat"
+        elseif q and (q.needPrev or q.needRank) and not state then
+            -- only a quest that waits for an earlier one ([prereq]): grey "!"
+            local lvl = tonumber(q.lvl)
+            if lvl and lvl > floorLevel then state = "soon" end
         end
     end
     return state
