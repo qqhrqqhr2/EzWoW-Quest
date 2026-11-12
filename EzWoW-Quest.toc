@@ -22,7 +22,7 @@
 ## Notes-zhTW: 任務追蹤、自動接受/交付、最佳獎勵標記、隊伍進度通報，以及地圖和小地圖上的任務目標與交付地點 (/ezq)
 ## X-License: GPL-3.0
 ## Author: qqhrqqhr2
-## Version: 1.0.13
+## Version: 1.0.14
 ## Category: EzWoW
 ## IconTexture: Interface\AddOns\EzWoW-Quest\Media\Icon
 ## SavedVariables: EzWoW_QuestDB, EzWoW_SharedData
