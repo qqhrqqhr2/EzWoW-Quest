@@ -926,16 +926,31 @@ local function setWaypointAt(mapID, x, y, labelText)
     end)
 end
 
+-- as the quest log marks: every arrow to this spot and the quest's details in
+-- the map's quest list; a second click takes the waypoint away again
 local function onPinClick(self)
     local group = self.group
     if not group then return end
     local item = group.items and group.items[1]
-    local labelText = (item and item.quest and item.quest.title) or ""
+    local quest = item and item.quest
+    local labelText = (quest and quest.title) or ""
+    local mark = ns.MarkClick
+    local key = group.spawn
+        or (group.mapPoint and (group.mapPoint[1] .. ":" .. group.mapPoint[2] .. ":" .. group.mapPoint[3]))
+    if mark and key and mark.clear(key) then return end
     if group.mapPoint then
+        local api = _G.EzWoWMapFinderAPI
+        if api and type(api.ClearPoint) == "function" then pcall(api.ClearPoint) end
         setWaypointAt(group.mapPoint[1], group.mapPoint[2], group.mapPoint[3], labelText)
     elseif group.spawn then
-        ns.ApplyWaypointForSpawn(group.spawn, labelText)
+        if mark then
+            mark.point(group.spawn, labelText)
+        elseif ns.ApplyWaypointForSpawn then
+            ns.ApplyWaypointForSpawn(group.spawn, labelText)
+        end
     end
+    if mark and key then mark.remember(key) end
+    if mark and quest and quest.id then mark.showDetails({ quests = { { id = quest.id } } }) end
 end
 
 -----------------------------------------------------------------------------
@@ -1476,6 +1491,12 @@ local function guideFromQuestLog(questID)
     if not questID or isSecret(questID) or not QuestObjectivePins.guideTo then return end
     local now = GetTime and GetTime() or 0
     if QuestObjectivePins.lastGuideID == questID and now - (QuestObjectivePins.lastGuideAt or 0) < 0.5 then return end
+    -- the game also opens details while a quest is being abandoned: only
+    -- quests still in the log are guided to
+    if C_QuestLog and C_QuestLog.GetLogIndexForQuestID then
+        local okIndex, index = pcall(C_QuestLog.GetLogIndexForQuestID, questID)
+        if okIndex and index == nil then return end
+    end
     -- one click reaches more than one hook in the same moment: only the first counts
     QuestObjectivePins.lastGuideID, QuestObjectivePins.lastGuideAt = questID, now
     if C_Timer and C_Timer.After then

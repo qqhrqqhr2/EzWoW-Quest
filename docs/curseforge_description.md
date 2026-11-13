@@ -13,7 +13,7 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker that
 
 ![Settings window](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/settings_en.png)
 
-*Mock-ups rebuilt from the window sizes, coordinates, colours and strings in the addon code. Quests and names are made up.*
+*In-game screenshots (WoW Forever, Korean client). Character and player names and chat text are blurred.*
 
 ## Features
 
@@ -46,10 +46,10 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker that
 - **Hollow gold ring**: the game's own quest area, for quests without objective dots.
 - **`?` badge**: where to turn in quests whose objectives are done, a yellow `?` in a small dark badge with a gold rim (grey `?` for quests in progress, optional).
 - Only objectives with a known location are shown; guessed spots are not.
-- Nearby dots also show on the minimap. Hover for the quest and objective, click to set a waypoint.
+- Nearby dots also show on the minimap. Hover for the quest and objective; click for the quest details and a waypoint (click again to remove).
 
 ### Quests you can take (needs EzWoW - Map Finder)
-- **`!` badge** on the World Map over NPCs with a quest you can take now. Hover for the NPC and its quests, click to set a waypoint.
+- **`!` badge** on the World Map over NPCs with a quest you can take now. Hover for the NPC and its quests, click to set a waypoint (click again to remove). Quests given only inside the NPC's talk options get a talk bubble icon.
 - Only quests that match your side, class, race, profession and level, with the earlier quests in the chain done. Holiday, event, donation, battleground and low-level quests are left out. Quest levels follow the WoW Forever server.
 - NPC and minimap tooltips list the quests that NPC gives (quests a few levels away in grey, "from Lv.N") and your finished quests to hand in there.
 - Can be turned off in the settings ("Show quest givers with quests you can take").
@@ -88,7 +88,7 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 �
 
 ![설정창](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/settings_ko.png)
 
-*애드온 코드의 창 크기·좌표·색상·문구로 재현한 예시 화면입니다. 퀘스트와 이름은 지어낸 예시입니다.*
+*실제 게임 화면입니다(WoW Forever, 한국어 클라이언트). 캐릭터 · 다른 플레이어 이름과 채팅 내용은 가렸습니다.*
 
 ## 기능
 
@@ -121,10 +121,10 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 �
 - **속이 빈 금색 고리**: 목표 위치 점이 없는 퀘스트의 퀘스트 지역(게임이 알려 주는 위치).
 - **`?` 표시**: 목표를 다 채운 퀘스트의 보고 위치. 금색 테두리의 작은 어두운 원 안에 노란 `?`(옵션을 켜면 진행 중인 퀘스트는 회색 `?`).
 - 위치가 확실한 목표만 표시하고, 짐작한 위치는 표시하지 않습니다.
-- 가까운 점은 미니맵에도 표시합니다. 마우스를 올리면 퀘스트와 목표, 클릭하면 웨이포인트.
+- 가까운 점은 미니맵에도 표시합니다. 마우스를 올리면 퀘스트와 목표, 클릭하면 퀘스트 내용과 웨이포인트(한 번 더 누르면 해제).
 
 ### 받을 수 있는 퀘스트 (EzWoW - Map Finder 필요)
-- **`!` 표시**: 지금 받을 수 있는 퀘스트가 있는 NPC를 세계지도에 표시합니다. 마우스를 올리면 NPC와 퀘스트 목록, 클릭하면 웨이포인트.
+- **`!` 표시**: 지금 받을 수 있는 퀘스트가 있는 NPC를 세계지도에 표시합니다. 마우스를 올리면 NPC와 퀘스트 목록, 클릭하면 웨이포인트(한 번 더 누르면 해제). 말풍선 대화 안에서만 주는 퀘스트는 말풍선 아이콘이 붙습니다.
 - 진영·직업·종족·전문 기술·레벨이 맞고 앞 단계 퀘스트를 마친 퀘스트만 나옵니다. 명절·이벤트·기부·전장 퀘스트와 너무 낮은 레벨의 퀘스트는 빠집니다. 퀘스트 레벨은 WoW Forever 서버 기준입니다.
 - NPC와 미니맵 툴팁에 그 NPC에게서 받을 수 있는 퀘스트(몇 레벨 뒤에 받을 퀘스트는 회색으로 "Lv.N부터")와 그 NPC에게 보고할 퀘스트가 나옵니다.
 - 설정창에서 끌 수 있습니다("받을 수 있는 퀘스트 주는 NPC 표시 (!)").

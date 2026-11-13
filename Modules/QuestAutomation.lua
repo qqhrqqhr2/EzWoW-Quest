@@ -159,10 +159,31 @@ end
 -----------------------------------------------------------------------------
 -- Quest detail / progress / reward
 -----------------------------------------------------------------------------
+local function questTaken(questID)
+    if not (C_QuestLog and C_QuestLog.GetLogIndexForQuestID) then return true end
+    return call(C_QuestLog.GetLogIndexForQuestID, questID) ~= nil
+end
+
 local function handleDetail()
     if not acceptOn() then return end
     if skipRisky() and ((call(QuestIsDaily) == true) or (call(QuestIsWeekly) == true)) then return end
-    call(AcceptQuest)
+    -- a moment after the window shows: a quest window opened through an NPC's
+    -- talk option doesn't take an accept right away. Tried again a few times
+    -- while a quest window is still open and its quest not yet in the log.
+    if not (C_Timer and C_Timer.After) then
+        call(AcceptQuest)
+        return
+    end
+    local tries = 0
+    local function try()
+        tries = tries + 1
+        if not acceptOn() or not (QuestFrame and QuestFrame:IsShown()) then return end
+        local questID = tonumber(call(GetQuestID))
+        if questID and questID > 0 and questTaken(questID) then return end
+        call(AcceptQuest)
+        if tries < 4 then C_Timer.After(0.4, try) end
+    end
+    C_Timer.After(0.3, try)
 end
 
 local function handleProgress()

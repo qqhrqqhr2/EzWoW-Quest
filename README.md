@@ -32,7 +32,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 
 ![설정창](docs/images/settings_ko.png)
 
-> 이미지는 애드온 코드의 창 크기·좌표·색상·문구로 재현한 **예시 화면**입니다. 지도·미니맵·아이콘은 단순화한 그림이고, 퀘스트·NPC·캐릭터 이름은 지어낸 예시입니다.
+> 실제 게임 화면입니다(WoW Forever, 한국어 클라이언트). 캐릭터 · 다른 플레이어 이름과 채팅 내용은 가렸습니다.
 
 ### 설치
 
@@ -41,7 +41,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 3. 지도 표시를 쓰려면 **EzWoW - Map Finder**도 함께 켭니다.
 4. 게임에서 `/ezq`(또는 `/퀘스트`)로 설정창을 엽니다.
 
-### 기능 (위 그림의 번호)
+### 기능
 
 | 번호 | 기능 | 설명 |
 |---|---|---|
@@ -58,7 +58,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 | ⑪ | 파티 진행 알림 | 파티(인스턴스 그룹)에 수락·목표 진행·목표 달성·완료를 알림. 공격대에서는 보내지 않음 |
 | ⑫ | 받을 수 있는 퀘스트 (`!`) | 지금 받을 수 있는 퀘스트가 있는 NPC를 세계지도에 금색 테두리의 작은 어두운 원 안에 노란 `!`로 표시. 마우스를 올리면 NPC 이름과 퀘스트 목록(`! [레벨] 퀘스트 이름`) |
 
-지도의 점·물음표·느낌표에 마우스를 올리면 퀘스트와 목표가 나오고, 클릭하면 그 자리에 웨이포인트를 찍습니다.
+지도의 점·물음표·느낌표에 마우스를 올리면 퀘스트와 목표가 나옵니다. 점과 물음표를 클릭하면 퀘스트 내용을 열고 그 자리에 웨이포인트를 찍고, 느낌표는 웨이포인트만 찍습니다. 한 번 더 누르면 웨이포인트를 지웁니다.
 
 #### 받을 수 있는 퀘스트 (`!`)
 
@@ -68,7 +68,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
   - `[조건]`: 평판·특수 조건·이벤트 NPC처럼 애드온이 미리 확인할 수 없는 조건이 있음
   - "Lv.N부터" / "숙련도 N부터": 레벨이나 전문 기술 숙련도가 모자람
 - 아이템으로 시작하는 퀘스트는 그 퀘스트를 완료하는 NPC에게 "주는 퀘스트"로 보이지 않습니다.
-- NPC에게 말을 걸면 게임이 실제로 주는 퀘스트 목록과 비교합니다. 데이터에는 있지만 주지 않은 퀘스트는 그 캐릭터에서 숨기고, 레벨이 오르면 다시 보여 줍니다.
+- 말풍선 대화 안에서만 주는 퀘스트는 툴팁에서 이름 앞에 말풍선 아이콘이 붙습니다.
 - 명절·이벤트·기부·전장 퀘스트와 너무 낮은 레벨(게임에서 회색으로 나오는) 퀘스트는 표시하지 않습니다.
 - 퀘스트 레벨은 WoW Forever 서버 기준입니다.
 - **NPC 툴팁과 미니맵 툴팁**에도 그 NPC에게서 받을 수 있는 퀘스트와 그 NPC에게 보고할 퀘스트(초록 `?`, "보고")가 나옵니다.
@@ -76,7 +76,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 #### 알아낸 퀘스트 위치와 공유
 
 - 퀘스트를 주고받는 NPC, 퀘스트 아이템이 나온 몬스터·오브젝트, 도착·정찰 목표를 마친 곳을 기억해서 지도에 보여 줍니다.
-- NPC에게 말을 걸었을 때 그 NPC가 준 퀘스트와 주지 않은 퀘스트도 종족·직업과 함께 공유합니다. 다른 사람이 받은 퀘스트는 데이터에 없어도 그 NPC의 `!`로 나오고, 데이터에 없는 NPC는 위치도 함께 공유됩니다. 내 종족·직업에게 주지 않았다는 기록이 쌓이면 `[조건]`으로 표시합니다.
+- NPC에게 말을 걸었을 때 그 NPC가 준 퀘스트도 종족·직업과 함께 공유합니다. 다른 사람이 받은 퀘스트는 데이터에 없어도 그 NPC의 `!`로 나오고, 데이터에 없는 NPC는 위치도 함께 공유됩니다.
 - 이 기록을 파티·길드와 이 애드온을 쓰는 다른 사람과 자동으로 공유합니다(애드온 메시지만 쓰고 채팅창에는 아무것도 나오지 않으며, 이름은 저장하지 않습니다). 공유 채널로 받은 퀘스트 NPC·몬스터 드롭은 여러 사람이 같은 내용을 보냈을 때 쓰고, 위치(정찰 지점, 오브젝트)는 받는 대로 씁니다.
 - 이를 위해 숨은 채널에 들어갑니다. 내 채널 번호가 바뀌지 않도록 높은 번호(10번 이상)를 씁니다. 같은 채널 사람끼리는 채널 목록에서 캐릭터 이름이 보입니다.
 - 설정에서 끌 수 있습니다("알아낸 퀘스트 위치를 다른 EzWoW 사용자와 공유").
@@ -195,7 +195,7 @@ All quest features in one addon.
 
 ![Settings window](docs/images/settings_en.png)
 
-> These are **mock-ups** rebuilt from the window sizes, coordinates, colours and strings in the code. The map, minimap and icons are simplified drawings; quests, NPCs and character names are made up.
+> In-game screenshots (WoW Forever, Korean client). Character and player names and chat text are blurred.
 
 ### Installation
 
@@ -204,7 +204,7 @@ All quest features in one addon.
 3. For the map marks, enable **EzWoW - Map Finder** as well.
 4. Open the settings in game with `/ezq` (or `/퀘스트`).
 
-### Features (numbers in the picture)
+### Features
 
 | No. | Feature | Description |
 |---|---|---|
@@ -221,7 +221,7 @@ All quest features in one addon.
 | ⑪ | Party progress messages | Tells your party (or instance group) about accepted quests, progress, finished objectives and turn-ins. Never sent in a raid |
 | ⑫ | Quests you can take (`!`) | NPCs with a quest you can take now get a yellow `!` in a small dark badge with a gold rim on the World Map. Hover for the NPC and its quests (`! [Lv] quest name`) |
 
-Hover a dot, question mark or exclamation mark on the map to see the quest and objective; click it to set a waypoint there.
+Hover a dot, question mark or exclamation mark on the map to see the quest and objective. Clicking a dot or question mark opens the quest details and sets a waypoint there; an exclamation mark only sets the waypoint. Click again to remove the waypoint.
 
 #### Quests you can take (`!`)
 
@@ -231,7 +231,7 @@ Hover a dot, question mark or exclamation mark on the map to see the quest and o
   - `[Cond.]`: a requirement the addon can't check (reputation, a special condition, an event NPC)
   - "from Lv.N" / "skill N+": your level or profession rank is too low
 - A quest that starts from an item is not listed as handed out by the NPC you turn it in to.
-- Talking to an NPC compares with the quests the game really offers. A quest in the data that the NPC did not offer is hidden for that character until it levels up.
+- A quest given only inside an NPC's talk options gets a talk bubble icon before its name in the tooltip.
 - Holiday, event, donation and battleground quests, and low-level quests (grey in the game), are not shown.
 - Quest levels follow the WoW Forever server.
 - **NPC and minimap tooltips** also list the quests that NPC gives and the finished quests to hand in there (green `?`, "hand in").
@@ -239,7 +239,7 @@ Hover a dot, question mark or exclamation mark on the map to see the quest and o
 #### Learned and shared quest spots
 
 - Remembers who gives and takes in your quests, which creatures and objects quest items come from, and where "reach" / "scout" objectives are done, and shows them on the map.
-- What an NPC offered or did not offer when you talked to it is shared too, with your race and class. Quests others were offered show on that NPC's `!` even when the data lacks them, and NPCs the data lacks are shared with their spot. Reports that your race or class was not offered a quest mark it `[Cond.]`.
+- What an NPC offered when you talked to it is shared too, with your race and class. Quests others were offered show on that NPC's `!` even when the data lacks them, and NPCs the data lacks are shared with their spot.
 - Shares them with your party, guild and other players of this addon automatically (addon messages only, nothing appears in chat, no names are stored). Quest NPCs and creature drops from the shared channel are used once several players report the same; places (scouting spots, looted objects) are used as they arrive.
 - For this the addon joins a hidden channel with a high number (10 or higher), so your own channel numbers stay the same. Players in that channel can see each other's character names in the channel list.
 - Can be turned off in the settings ("Share learned quest spots with other EzWoW users").

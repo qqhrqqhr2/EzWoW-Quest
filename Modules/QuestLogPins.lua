@@ -12,9 +12,9 @@ local CreateFrame = (ns.GamePad and ns.GamePad.MakeFrame) or CreateFrame
 
 -- The "EzWoW - ..." name line at the end of tooltip additions is drawn small.
 -- Shared by the EzWoW addons: the first one loaded sets it up.
-if not (_G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.version == 3) then
+if not (_G.EzWoWTooltipTagSizer and (tonumber(_G.EzWoWTooltipTagSizer.version) or 0) >= 4) then
     local sizer = {}
-    sizer.version = 3
+    sizer.version = 4
     _G.EzWoWTooltipTagSizer = sizer
     local smallFont
     local original = setmetatable({}, { __mode = "k" })   -- font string -> its own font object
@@ -31,14 +31,25 @@ if not (_G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.version == 3) then
         if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then return false end
         return text:find("^EzWoW %- ") ~= nil
     end
+    -- the size goes on the line itself too: a size another addon put on the
+    -- line (a font addon) would stay over the font object otherwise
+    local function setSize(fs, font)
+        if not (font and font.GetFont and fs.SetFont) then return end
+        local path, size, flags = font:GetFont()
+        if path and size then fs:SetFont(path, size, flags or "") end
+    end
     local function fit(fs, tag)
         if not fs then return end
         if tag then
             if not original[fs] then original[fs] = fs:GetFontObject() or GameTooltipText end
-            if tagFont() then fs:SetFontObject(smallFont) end
+            if tagFont() then
+                fs:SetFontObject(smallFont)
+                setSize(fs, smallFont)
+            end
             fs:SetTextColor(0.5, 0.5, 0.5)
         elseif original[fs] then
             fs:SetFontObject(original[fs])
+            setSize(fs, original[fs])
             original[fs] = nil
         end
     end
@@ -63,6 +74,7 @@ if not (_G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.version == 3) then
             local fsName = fs.GetName and fs:GetName()
             if type(fsName) == "string" and (fsName:find(rightPrefix, 1, true) == 1 or fsName:find(leftPrefix, 1, true) == 1) then
                 fs:SetFontObject(font)
+                setSize(fs, font)
                 original[fs] = nil
             end
         end
@@ -272,23 +284,21 @@ local function turnedInSet(create)
     return set
 end
 
--- Quests the data says an NPC gives, but which that NPC did not offer this
--- character when it last talked to them (changed or hidden requirements on
--- this server). [questID] = character level then; shown again after a level up.
-local function notOfferedSet(create)
-    if not ns.DB then return nil end
-    local guid = UnitGUID and UnitGUID("player")
-    if type(guid) ~= "string" or isSecret(guid) then return nil end
-    if type(ns.DB.questNotOffered) ~= "table" then
-        if not create then return nil end
-        ns.DB.questNotOffered = {}
+-- Notes of quests an NPC did not offer are no longer kept (an NPC may give a
+-- quest only through its talk options, which the first list doesn't show).
+-- What older copies noted is cleared once: the per-character list and this
+-- character's own "not offered" notes in the shared records.
+local function clearNotOfferedNotes()
+    if not ns.DB or ns.DB.questOwnOfferVersion == 3 then return end
+    ns.DB.questNotOffered = nil
+    ns.DB.questNotOfferedVersion = nil
+    if not (ns.Share and type(ns.Share.Store) == "function") then return end
+    local okStore, store = pcall(ns.Share.Store, "Q")
+    if not okStore or type(store) ~= "table" then return end
+    for _, row in pairs(store) do
+        if type(row) == "table" and type(row.own) == "table" and row.own[1] == 0 then row.own = nil end
     end
-    local set = ns.DB.questNotOffered[guid]
-    if not set and create then
-        set = {}
-        ns.DB.questNotOffered[guid] = set
-    end
-    return set
+    ns.DB.questOwnOfferVersion = 3
 end
 
 -- What NPCs offered when players talked to them, shared between EzWoW users
@@ -311,27 +321,62 @@ local function offerStore()
     return ok and type(store) == "table" and store or nil
 end
 
+-- offer states: 1 offered, 2 offered through a talk option
+-- ("Anything else?"), not in the NPC's first list
+local OFFER_STATES = { [1] = true, [2] = true }   -- (0 from older copies is left out)
+-- the talk bubble of the NPC dialog, in front of such a quest in the tooltip
+local TALK_ICON = "|TInterface\\GossipFrame\\GossipGossipIcon:0|t "
+
 -- every vote on one NPC and quest: { state, raceID, classID } (this player's own included)
+-- The records shipped with the addons count as well, each player once.
 local function offerVoteList(npcId, questID)
+    local key = npcId .. ":" .. questID
     local store = offerStore()
-    local row = store and store[npcId .. ":" .. questID]
+    local row = store and store[key]
+    if type(row) ~= "table" then row = {} end
+    local share = ns.Share
+    local function isOwn(h)
+        return share and type(share.IsOwnHash) == "function" and share.IsOwnHash(h)
+    end
     local out = {}
-    if type(row) ~= "table" then return out end
-    if type(row.own) == "table" and (row.own[1] == 0 or row.own[1] == 1) then
+    if type(row.own) == "table" and OFFER_STATES[row.own[1]] then
         out[#out + 1] = { row.own[1], row.own[3], row.own[4] }
     end
-    for _, v in pairs(type(row.peers) == "table" and row.peers or {}) do
-        if type(v) == "table" and (v[1] == 0 or v[1] == 1) then out[#out + 1] = v
-        elseif v == 0 or v == 1 then out[#out + 1] = { v } end
+    local peers = type(row.peers) == "table" and row.peers or {}
+    for h, v in pairs(peers) do
+        -- (older copies kept this character's own messages coming back)
+        if not isOwn(h) then
+            if type(v) == "table" and OFFER_STATES[v[1]] then out[#out + 1] = v
+            elseif OFFER_STATES[v] then out[#out + 1] = { v } end
+        end
+    end
+    local seed = share and type(share.Seed) == "function" and share.Seed("offers")
+    local shipped = seed and seed[key]
+    if type(shipped) == "table" then
+        for _, v in ipairs(shipped) do
+            local h = type(v) == "table" and v[4]
+            if OFFER_STATES[v[1]] and h and peers[h] == nil and not isOwn(h)
+                and not (h == "own" and type(row.own) == "table") then
+                out[#out + 1] = { v[1], v[2], v[3] }
+            end
+        end
     end
     return out
+end
+
+-- true when players got this quest from the NPC through a talk option
+local function offeredByTalk(npcId, questID)
+    for _, v in ipairs(offerVoteList(npcId, questID)) do
+        if v[1] == 2 then return true end
+    end
+    return false
 end
 
 -- offered, notOffered: how many players saw each
 local function offerVotes(npcId, questID)
     local yes, no = 0, 0
     for _, v in ipairs(offerVoteList(npcId, questID)) do
-        if v[1] == 1 then yes = yes + 1 else no = no + 1 end
+        if v[1] ~= 0 then yes = yes + 1 else no = no + 1 end
     end
     return yes, no
 end
@@ -342,7 +387,7 @@ local function offerSaysNo(npcId, questID, me)
     local race, class = { yes = 0, no = 0 }, { yes = 0, no = 0 }
     local all = { yes = 0, no = 0 }
     for _, v in ipairs(offerVoteList(npcId, questID)) do
-        local k = v[1] == 1 and "yes" or "no"
+        local k = v[1] ~= 0 and "yes" or "no"
         all[k] = all[k] + 1
         local sameRace = me and me.raceID and v[2] == me.raceID
         local sameClass = me and me.classID and v[3] == me.classID
@@ -538,6 +583,82 @@ function QuestLogPins.canvas()
         or WorldMapFrame
 end
 
+-- A second click on the same mark takes its waypoint away again, with the
+-- arrow pins the quest's details started (a quest list click guides there)
+local lastPinSpawn
+local function hasUserWaypoint()
+    if not (C_Map and C_Map.HasUserWaypoint) then return false end
+    local ok, has = pcall(C_Map.HasUserWaypoint)
+    return ok and has == true
+end
+
+-- true when this click removed what the same mark had set
+-- (sp: the spawn, or any key that stands for the spot)
+local function clearPinWaypoint(sp)
+    if not (sp and lastPinSpawn == sp) then return false end
+    lastPinSpawn = nil
+    local api = _G.EzWoWMapFinderAPI
+    local guided = api and type(api.HasPoint) == "function" and api.HasPoint() == true
+    if not (guided or hasUserWaypoint()) then return false end
+    if api and type(api.ClearPoint) == "function" then pcall(api.ClearPoint) end
+    if C_Map and C_Map.ClearUserWaypoint then pcall(C_Map.ClearUserWaypoint) end
+    return true
+end
+
+local function rememberPinWaypoint(sp)
+    lastPinSpawn = sp
+end
+
+-- Every arrow points at the clicked mark: what pointed elsewhere goes, the
+-- moving arrow pin and the waypoint go to this spot
+local function pointAtPin(sp, label)
+    local api = _G.EzWoWMapFinderAPI
+    if api and type(api.ClearPoint) == "function" then pcall(api.ClearPoint) end
+    if api and type(api.PointAtSpawn) == "function" then
+        local text = label or ""
+        local shown = {
+            kind = "npc",
+            names = setmetatable({}, { __index = function() return text end }),
+            spawns = { sp },
+        }
+        pcall(api.PointAtSpawn, shown, 1)
+    end
+    if ns.ApplyWaypointForSpawn then ns.ApplyWaypointForSpawn(sp, label or "") end
+end
+
+-- The quest's details in the map's quest list, as a click on the quest there
+-- (a quest ready to turn in first)
+local function showQuestDetails(group)
+    local quests = group and group.quests
+    if not quests or #quests == 0 then return end
+    local quest = quests[1]
+    for _, q in ipairs(quests) do
+        if q.complete then quest = q break end
+    end
+    local questID = quest and quest.id
+    if not questID or (ns.IsGamePadUI and ns.IsGamePadUI()) then return end
+    -- a click in the quest list also guides to the quest's nearest spot: not
+    -- here, the arrows stay on the clicked mark
+    local guide = ns.QuestObjectivePins
+    if guide then guide.lastGuideID, guide.lastGuideAt = questID, (GetTime and GetTime()) or 0 end
+    local list = _G.QuestMapFrame
+    if WorldMapFrame and WorldMapFrame:IsShown() and list and list:IsShown()
+        and type(QuestMapFrame_ShowQuestDetails) == "function" then
+        if pcall(QuestMapFrame_ShowQuestDetails, questID) then return end
+    end
+    if type(QuestMapFrame_OpenToQuestDetails) == "function" then
+        pcall(QuestMapFrame_OpenToQuestDetails, questID)
+    end
+end
+
+-- the same click on the quest objective marks
+ns.MarkClick = {
+    point = pointAtPin,
+    clear = clearPinWaypoint,
+    remember = rememberPinWaypoint,
+    showDetails = showQuestDetails,
+}
+
 function QuestLogPins.obtainPin(index)
     local pin = pins[index]
     if pin then return pin end
@@ -582,10 +703,16 @@ function QuestLogPins.obtainPin(index)
     pin:HookScript("OnEnter", raisePin)
     pin:HookScript("OnLeave", lowerPin)
     pin:SetScript("OnClick", function(self)
-        local sp = self.group and self.group.spawn
-        if not sp then return end
-        local quest = self.group.quests and self.group.quests[1]
-        ns.ApplyWaypointForSpawn(sp, self.group.npcName or (quest and quest.title) or "")
+        local group = self.group
+        if not group then return end
+        local sp = group.spawn
+        if clearPinWaypoint(sp) then return end
+        if sp then
+            local quest = group.quests and group.quests[1]
+            pointAtPin(sp, group.npcName or (quest and quest.title) or "")
+            rememberPinWaypoint(sp)
+        end
+        showQuestDetails(group)
     end)
     ns.PassMapRightClicks(pin)
     pins[index] = pin
@@ -1160,13 +1287,8 @@ local function prerequisitesMet(q, me, questID)
     return true
 end
 
-local function takeable(questID, me, ignoreNotOffered)
+local function takeable(questID, me)
     if questDone(questID) or questInLog(questID) then return nil end
-    if not ignoreNotOffered then
-        local notOffered = notOfferedSet()
-        local seenAt = notOffered and tonumber(notOffered[questID])
-        if seenAt and seenAt >= (me.level or 0) then return nil end
-    end
     local q = questInfo(questID)
     if specialQuest(questID, q) then return nil end
     if not questForMe(questID, me) then return nil end
@@ -1282,6 +1404,8 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
                 name = ns:L("NPC_TT_CONDITION") .. " " .. name
             end
             if q.needPrev then name = ns:L("NPC_TT_PREREQ") .. " " .. name end
+            -- given through a talk option, not in the NPC's first list
+            if offeredByTalk(npcId, questID) then name = TALK_ICON .. name end
             local text = (again and "? " or "! ") .. prefix .. name
             if (q.min or 0) > me.level then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_LEVEL"), q.min) .. ")" end
             if q.needRank then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_SKILL"), q.needRank) .. ")" end
@@ -1326,17 +1450,19 @@ function QuestLogPins.resetNpcQuests()
     giverSpotsByMap = {}
 end
 
--- When the player talks to an NPC, the game lists the quests it offers now.
--- A quest the data gives to that NPC, which this character could take by the
--- data, but which is not in that list is remembered as not offered (see
--- notOfferedSet); one offered again is forgotten.
+-- When the player talks to an NPC, the game lists the quests it offers now:
+-- those are noted (and shared). A quest missing from the list is not noted.
 local function plainValue(v)
     if v == nil or isSecret(v) then return nil end
     return v
 end
 
-function QuestLogPins.noteOffered(npcId, offeredIDs, offeredTitles)
+-- partial: the list may not be all the NPC offers (more talk options open
+-- further quests): only offered quests are noted then
+-- talkIDs: quests reached through a talk option (not in the first list)
+function QuestLogPins.noteOffered(npcId, offeredIDs, offeredTitles, partial, talkIDs)
     if not npcId then return end
+    clearNotOfferedNotes()
     buildNpcQuests()
     local me = playerInfo()
     local changed = false
@@ -1345,20 +1471,16 @@ function QuestLogPins.noteOffered(npcId, offeredIDs, offeredTitles)
     -- shared with where it stands
     local known = entryByKey and entryByKey["npc:" .. npcId]
     local spot = not known and playerSpot() or nil
-    for questID in pairs(offeredIDs) do
-        if type(questID) == "number" and noteOwnOffer(npcId, questID, 1, me, spot) then changed = true end
+    local function offeredState(questID)
+        return (talkIDs and talkIDs[questID]) and 2 or 1
     end
-    local gives = npcGives and npcGives[npcId]
-    local set = notOfferedSet(true)
-    for questID in pairs(gives and set and gives or {}) do
-        local q = takeable(questID, me, true)
-        local offered = offeredIDs[questID] or offeredTitles[questName(questID)]
-        if offered then
-            if set[questID] then set[questID] = nil; changed = true end
-            if noteOwnOffer(npcId, questID, 1, me, spot) then changed = true end
-        elseif q and not q.needPrev and not q.needRank and (tonumber(q.min) or 0) <= me.level then
-            if set[questID] ~= me.level then set[questID] = me.level; changed = true end
-            if noteOwnOffer(npcId, questID, 0, me, spot) then changed = true end
+    for questID in pairs(offeredIDs) do
+        if type(questID) == "number" and noteOwnOffer(npcId, questID, offeredState(questID), me, spot) then changed = true end
+    end
+    -- quests of this NPC in the data that came only by title (older lists)
+    for questID in pairs(npcGives and npcGives[npcId] or {}) do
+        if not offeredIDs[questID] and offeredTitles[questName(questID)] then
+            if noteOwnOffer(npcId, questID, offeredState(questID), me, spot) then changed = true end
         end
     end
     if changed then QuestLogPins.resetNpcQuests() end
@@ -1366,10 +1488,14 @@ function QuestLogPins.noteOffered(npcId, offeredIDs, offeredTitles)
 end
 
 local function talkingNpcId()
-    local guid = plainValue(UnitGUID and UnitGUID("npc"))
-    local key = guid and guidToStarter(guid)
-    local id = key and key:match("^npc:(%d+)$")
-    return tonumber(id)
+    for _, unit in ipairs({ "npc", "questnpc" }) do
+        local okGuid, guid = pcall(UnitGUID, unit)
+        guid = okGuid and plainValue(guid) or nil
+        local key = guid and guidToStarter(guid)
+        local id = key and tonumber(key:match("^npc:(%d+)$"))
+        if id then return id end
+    end
+    return nil
 end
 
 -- shared record kind "Q": "npcID,questID,state,level,raceID,classID[,continent,x,y]"
@@ -1381,7 +1507,7 @@ if ns.Share and type(ns.Share.RegisterKind) == "function" then
             for key, row in pairs(offerStore() or {}) do
                 local own = type(row) == "table" and row.own
                 local npcId, questID = tostring(key):match("^(%d+):(%d+)$")
-                if npcId and type(own) == "table" and (own[1] == 0 or own[1] == 1) then
+                if npcId and type(own) == "table" and OFFER_STATES[own[1]] then
                     local body = string.format("%d,%d,%d,%d,%d,%d", tonumber(npcId), tonumber(questID), own[1],
                         tonumber(own[2]) or 0, tonumber(own[3]) or 0, tonumber(own[4]) or 0)
                     local sp = row.ownSpot and row.spot
@@ -1394,7 +1520,8 @@ if ns.Share and type(ns.Share.RegisterKind) == "function" then
             return out
         end,
         receive = function(body, hash)
-            local npcId, questID, state, level, rest = body:match("^(%d+),(%d+),([01]),(%d+),?(.*)$")
+            local npcId, questID, state, level, rest = body:match("^(%d+),(%d+),([012]),(%d+),?(.*)$")
+            if state == "0" then return false end   -- "not offered" from older copies
             npcId, questID, state, level = tonumber(npcId), tonumber(questID), tonumber(state), tonumber(level)
             if not (npcId and questID and state and level) or npcId < 1 or npcId > 10000000
                 or questID < 1 or questID > 1000000 or level > 200 then return false end
@@ -1425,47 +1552,122 @@ if ns.Share and type(ns.Share.RegisterKind) == "function" then
     })
 end
 
+-- Talk options ("Anything else?") may lead to quests that the first list
+-- doesn't show; the shop, trainer, flight and similar options don't.
+local GOSSIP_TALK_ICON = 132053   -- Interface\GossipFrame\GossipGossipIcon
+local function hasTalkOption(gossip)
+    if type(gossip.GetOptions) ~= "function" then return true end
+    local okOpts, options = pcall(gossip.GetOptions)
+    if not okOpts or type(options) ~= "table" then return true end
+    for _, option in ipairs(options) do
+        if type(option) == "table" then
+            local icon = plainValue(option.icon)
+            if icon == nil or icon == GOSSIP_TALK_ICON
+                or (type(icon) == "string" and icon:lower():find("gossipgossipicon", 1, true)) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local offerEvents = CreateFrame("Frame")
 local listSeenAt, listNpc = -100, nil
-offerEvents:SetScript("OnEvent", function(_, event)
+-- the quests on the first page of the talk with that NPC: a talk option can
+-- open another page that lists more quests
+local listIDs, listTitles = {}, {}
+local closedAt = -100   -- the dialog was closed then (a new talk starts after)
+
+local function newTalk(npcId)
+    if listNpc ~= npcId or GetTime() - listSeenAt > 60 then return true end
+    -- closed in between (not just the next page of the same talk)
+    return closedAt > listSeenAt and GetTime() - closedAt > 1
+end
+
+offerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
+    if event == "GOSSIP_CLOSED" then
+        closedAt = GetTime()
+        return
+    end
     local ok = pcall(function()
         local npcId = talkingNpcId()
+        -- a quest window opened from an NPC's dialog may not name the NPC:
+        -- the one talked to a moment ago
+        if not npcId and event ~= "GOSSIP_SHOW" and listNpc and GetTime() - listSeenAt < 60 then
+            npcId = listNpc
+        end
         if not npcId then return end
         local ids, titles = {}, {}
+        local partial, talk = false, nil
         if event == "GOSSIP_SHOW" then
             local gossip = C_GossipInfo
             if type(gossip) ~= "table" or type(gossip.GetAvailableQuests) ~= "function" then return end
+            local first = newTalk(npcId)
             listSeenAt, listNpc = GetTime(), npcId
+            partial = hasTalkOption(gossip)
             for _, info in ipairs(gossip.GetAvailableQuests() or {}) do
                 local id = type(info) == "table" and plainValue(info.questID)
                 if type(id) == "number" then ids[id] = true end
                 local title = type(info) == "table" and plainValue(info.title)
                 if type(title) == "string" then titles[title] = true end
             end
+            if first then
+                listIDs, listTitles = ids, titles
+            else
+                -- a later page of the same talk: its quests came by talking
+                partial = true
+                for id in pairs(ids) do
+                    if not listIDs[id] then
+                        talk = talk or {}
+                        talk[id] = true
+                    end
+                end
+            end
         elseif event == "QUEST_GREETING" then
             if type(GetNumAvailableQuests) ~= "function" or type(GetAvailableTitle) ~= "function" then return end
+            if newTalk(npcId) then listIDs, listTitles = ids, titles end
             listSeenAt, listNpc = GetTime(), npcId
             for i = 1, (plainValue(GetNumAvailableQuests()) or 0) do
                 local title = plainValue(GetAvailableTitle(i))
                 if type(title) == "string" then titles[title] = true end
             end
+        elseif event == "QUEST_ACCEPTED" then
+            -- taken from the NPC talked to a moment ago (auto accept may take
+            -- it before the quest window can be read): offered by that NPC
+            if not (listNpc == npcId and GetTime() - listSeenAt < 60) then return end
+            local id = plainValue(arg2) or plainValue(arg1)
+            if type(arg2) ~= "number" then id = plainValue(arg1) end
+            if type(id) ~= "number" or id <= 0 then return end
+            partial = true
+            ids[id] = true
+            local title = questName(id)
+            if not listIDs[id] and not (type(title) == "string" and listTitles[title]) then
+                talk = { [id] = true }
+            end
         elseif event == "QUEST_DETAIL" then
             -- straight to one quest (no list first): that NPC offers only it;
-            -- picked from this NPC's list a moment ago: not the whole offer
-            if listNpc == npcId and GetTime() - listSeenAt < 60 then return end
+            -- picked from this NPC's list (or reached by talking) a moment ago:
+            -- offered, but not the whole offer
+            partial = listNpc == npcId and GetTime() - listSeenAt < 60
             local id = type(GetQuestID) == "function" and plainValue(GetQuestID())
             if type(id) ~= "number" or id <= 0 then return end
             ids[id] = true
+            -- opened from this NPC's talk, not from its first list
+            local title = type(GetTitleText) == "function" and plainValue(GetTitleText())
+            if partial and not listIDs[id] and not (type(title) == "string" and listTitles[title]) then
+                talk = { [id] = true }
+            end
         elseif event == "QUEST_PROGRESS" or event == "QUEST_COMPLETE" then
             -- straight to a quest being handed in (no list first): the NPC
             -- has no quest to offer now, or the game would list them first
             if listNpc == npcId and GetTime() - listSeenAt < 60 then return end
         end
-        QuestLogPins.noteOffered(npcId, ids, titles)
+        QuestLogPins.noteOffered(npcId, ids, titles, partial, talk)
     end)
     if not ok then return end
 end)
-for _, event in ipairs({ "GOSSIP_SHOW", "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE" }) do
+for _, event in ipairs({ "GOSSIP_SHOW", "GOSSIP_CLOSED", "QUEST_GREETING", "QUEST_DETAIL", "QUEST_ACCEPTED",
+    "QUEST_PROGRESS", "QUEST_COMPLETE" }) do
     pcall(offerEvents.RegisterEvent, offerEvents, event)
 end
 
@@ -1581,11 +1783,13 @@ local function obtainGiverPin(index)
     pin:HookScript("OnLeave", lowerPin)
     pin:SetScript("OnClick", function(self)
         local sp = self.group and self.group.spawn
+        if clearPinWaypoint(sp) then return end
         if sp then
             local npcId = self.group.npcIds and self.group.npcIds[1]
             local entry = npcId and entryByKey["npc:" .. npcId]
             local name = entry and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(entry) or ""
-            ns.ApplyWaypointForSpawn(sp, name)
+            pointAtPin(sp, name)
+            rememberPinWaypoint(sp)
         end
     end)
     ns.PassMapRightClicks(pin)
