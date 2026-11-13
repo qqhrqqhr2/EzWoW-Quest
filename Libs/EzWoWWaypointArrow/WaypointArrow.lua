@@ -15,7 +15,7 @@ local ADDON_NAME, ns = ...
 local type, pcall, tostring, tonumber, ipairs = type, pcall, tostring, tonumber, ipairs
 local atan2, sqrt, floor, abs = math.atan2 or math.atan, math.sqrt, math.floor, math.abs
 
-local LIB_VERSION = 3
+local LIB_VERSION = 4
 
 local lib = _G.EzWoW_WaypointArrow
 if type(lib) ~= "table" then
@@ -273,24 +273,70 @@ function lib.ToggleMenu()
     m:Show()
 end
 
--- name and source of the waypoint an EzWoW addon set last
+-- name and source of the waypoint an EzWoW addon set last; also kept in the
+-- shared saved data (t = when, so the newest saved copy wins) so it survives /reload and relog
 local label
+
+-- the saved data is account-wide but the waypoint is per character,
+-- so each character keeps its own label (by GUID)
+local function labelKey()
+    local ok, guid = call(UnitGUID, "player")
+    if ok and type(guid) == "string" and not isSecret(guid) and guid ~= "" then return guid end
+    return nil
+end
+
+local function storeLabel(v)
+    label = v
+    local settings = savedPosition()
+    if not settings then return end
+    local key = labelKey()
+    if key then
+        if type(settings.arrowLabels) ~= "table" then settings.arrowLabels = {} end
+        settings.arrowLabels[key] = v
+    else
+        settings.arrowLabel = v
+    end
+end
 
 -- called right after an addon sets a waypoint: the name is tied to the
 -- waypoint the game now holds (a later one set by hand shows the zone name)
 function lib.SetLabel(name, source)
     local mapID, x, y = currentWaypoint()
     if type(name) ~= "string" or isSecret(name) or name == "" or not mapID then
-        label = nil
+        storeLabel(nil)
     else
-        label = { text = name, source = type(source) == "string" and source or nil, mapID = mapID, x = x, y = y }
+        if type(source) ~= "string" or isSecret(source) or source == "" then source = nil end
+        storeLabel({ text = name, source = source, mapID = mapID, x = x, y = y,
+            t = (type(time) == "function" and time()) or 0 })
     end
     if lib.Refresh then pcall(lib.Refresh) end
 end
 
+local function validLabel(v)
+    return type(v) == "table" and type(v.text) == "string" and v.text ~= ""
+        and num(v.mapID) and num(v.x) and num(v.y) and v or nil
+end
+
+local function savedLabel()
+    local settings = savedPosition()
+    if not settings then return nil end
+    local key = labelKey()
+    if key then
+        local labels = settings.arrowLabels
+        return validLabel(type(labels) == "table" and labels[key] or nil)
+    end
+    return validLabel(settings.arrowLabel)
+end
+
 local function labelFor(mapID, x, y)
-    if label and label.mapID == mapID and abs(label.x - x) < 0.0005 and abs(label.y - y) < 0.0005 then
-        return label.text, label.source
+    local l = label
+    if not l then
+        -- read lazily: the saved data is complete only after every addon has loaded
+        l = savedLabel()
+        if l then label = l end
+    end
+    if l and l.mapID == mapID and abs(l.x - x) < 0.0005 and abs(l.y - y) < 0.0005 then
+        return l.text, type(l.source) == "string" and l.source or nil
     end
     return mapName(mapID), nil
 end
@@ -424,7 +470,7 @@ function lib.Create()
         GameTooltip:Hide()
     end)
     stop:SetScript("OnClick", function()
-        label = nil
+        storeLabel(nil)
         if C_Map and C_Map.ClearUserWaypoint then pcall(C_Map.ClearUserWaypoint) end
         lib.Refresh()
     end)

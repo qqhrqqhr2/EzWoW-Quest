@@ -1784,6 +1784,8 @@ local function guideText(key)
 end
 
 local function guideSay(text)
+    -- a chat line added in combat would taint the chat history: none then
+    if InCombatLockdown and InCombatLockdown() then return end
     if DEFAULT_CHAT_FRAME and text then
         DEFAULT_CHAT_FRAME:AddMessage("|cff4bc8e8EzWoW - Quest|r: " .. text)
     end
@@ -1870,8 +1872,9 @@ function QuestObjectivePins.guideTo(questID)
             (mapInfo and mapInfo.name) or "?", mx * 100, my * 100))
     end
     -- Map Finder's moving arrow pins when it is there: every spot of this step
-    -- gets a pin, the nearest one the big pin and the waypoint
-    if api and type(api.PointAtSpawn) == "function" then
+    -- gets a pin, the nearest one the big pin and the waypoint. Not in combat:
+    -- that opens or moves the World Map from addon code (its pins get blocked)
+    if api and type(api.PointAtSpawn) == "function" and not (InCombatLockdown and InCombatLockdown()) then
         local shownSpawns, primary, seenSpot = {}, 1, {}
         local bestKey = spotKeyOf(best[1])
         for _, cand in ipairs(spots) do

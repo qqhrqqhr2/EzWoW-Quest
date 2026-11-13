@@ -197,22 +197,43 @@ function ns.QuestLevelPrefix(questID)
     return "[" .. level .. suffix .. "] "
 end
 
+-- One walk over every spawn of the data: not in combat, where the client stops a
+-- script that runs too long (the index is built after login, out of combat). It is
+-- built in locals first, so a walk stopped half way leaves no partial index behind.
 function QuestLogPins.buildIndexes()
     if questIndex or not ns.HasMapFinder() then return end
-    questIndex, npcBySpot, entryByKey = {}, {}, {}
+    if InCombatLockdown and InCombatLockdown() then return end
+    local quests, bySpot, byKey = {}, {}, {}
     for _, e in ipairs(ns.MapData()) do
         if (e.kind == "npc" or e.kind == "object") and e.id and e.spawns then
-            entryByKey[e.kind .. ":" .. e.id] = entryByKey[e.kind .. ":" .. e.id] or e
+            byKey[e.kind .. ":" .. e.id] = byKey[e.kind .. ":" .. e.id] or e
         end
         if e.kind == "quest" and e.id then
-            questIndex[e.id] = e
+            quests[e.id] = e
         elseif e.kind == "npc" and e.spawns then
             for _, sp in ipairs(e.spawns) do
                 local key = spotKey(sp)
-                if key and not npcBySpot[key] then npcBySpot[key] = e end
+                if key and not bySpot[key] then bySpot[key] = e end
             end
         end
     end
+    questIndex, npcBySpot, entryByKey = quests, bySpot, byKey
+end
+
+-- ready before the first fight: built a few seconds after each loading screen and
+-- after combat, whenever it is still missing
+do
+    local warm = CreateFrame("Frame")
+    pcall(warm.RegisterEvent, warm, "PLAYER_ENTERING_WORLD")
+    pcall(warm.RegisterEvent, warm, "PLAYER_REGEN_ENABLED")
+    warm:SetScript("OnEvent", function()
+        if questIndex or not (C_Timer and C_Timer.After) then return end
+        C_Timer.After(3, function()
+            if not questIndex and not (InCombatLockdown and InCombatLockdown()) then
+                pcall(QuestLogPins.buildIndexes)
+            end
+        end)
+    end)
 end
 
 -- Quest spots are stored as NPC spots first, then object spots; within each
@@ -287,23 +308,45 @@ end
 -- Notes of quests an NPC did not offer are no longer kept (an NPC may give a
 -- quest only through its talk options, which the first list doesn't show).
 -- What older copies noted is cleared once: the per-character list and this
--- character's own "not offered" notes in the shared records.
+-- character's own "not offered" notes in the shared records. Own "through a
+-- talk option" notes go too: older copies could credit a quest from an
+-- object, an item or a player to the NPC talked to before (real ones come
+-- back at the next talk). The spot noted with such a note is where the
+-- player stood, not the NPC: it goes too.
+-- false, not nil: the shared data joins every addon's saved copy and would
+-- bring a nil value back from an older copy.
+-- Runs once per session after login (every addon's copy is joined by then):
+-- an older copy joined first can bring such notes back in any session.
+-- Notes made by this copy carry a mark (own[5] == 1) and are kept.
+local notesCleared = false
 local function clearNotOfferedNotes()
-    if not ns.DB or ns.DB.questOwnOfferVersion == 3 then return end
+    if notesCleared or not ns.DB then return end
+    if type(IsLoggedIn) == "function" and not IsLoggedIn() then return end
+    local okStore, store = false, nil
+    if ns.Share and type(ns.Share.Store) == "function" then
+        okStore, store = pcall(ns.Share.Store, "Q")
+    end
+    if not okStore or type(store) ~= "table" then return end
+    notesCleared = true
     ns.DB.questNotOffered = nil
     ns.DB.questNotOfferedVersion = nil
-    if not (ns.Share and type(ns.Share.Store) == "function") then return end
-    local okStore, store = pcall(ns.Share.Store, "Q")
-    if not okStore or type(store) ~= "table" then return end
+    ns.DB.questOwnOfferVersion = nil
+    local dropped = false
     for _, row in pairs(store) do
-        if type(row) == "table" and type(row.own) == "table" and row.own[1] == 0 then row.own = nil end
+        local own = type(row) == "table" and row.own
+        if type(own) == "table" and (own[1] == 0 or own[1] == 2) and own[5] ~= 1 then
+            row.own = false
+            if row.ownSpot == true then row.spot = false end
+            row.ownSpot = false
+            dropped = true
+        end
     end
-    ns.DB.questOwnOfferVersion = 3
+    return dropped
 end
 
 -- What NPCs offered when players talked to them, shared between EzWoW users
 -- (shared record kind "Q", registered below): store["npcID:questID"] =
---   { own = { state, level, raceID, classID }, peers = { [sender] = { state, raceID, classID } },
+--   { own = { state, level, raceID, classID, 1 }, peers = { [sender] = { state, raceID, classID } },
 --     spot = { continent, x, y, 0 } where the NPC stood (only for NPCs the data lacks) }
 -- state 1: the NPC offered the quest; 0: it did not, though the player met
 -- every requirement this addon knows of. Each addon decides what to show
@@ -356,7 +399,8 @@ local function offerVoteList(npcId, questID)
         for _, v in ipairs(shipped) do
             local h = type(v) == "table" and v[4]
             if OFFER_STATES[v[1]] and h and peers[h] == nil and not isOwn(h)
-                and not (h == "own" and type(row.own) == "table") then
+                -- (a cleared own note, false, also hides the shipped copy of that note)
+                and not (h == "own" and row.own ~= nil) then
                 out[#out + 1] = { v[1], v[2], v[3] }
             end
         end
@@ -410,10 +454,12 @@ local function noteOwnOffer(npcId, questID, state, me, spot)
     local key = npcId .. ":" .. questID
     local row = type(store[key]) == "table" and store[key] or {}
     store[key] = row
-    if spot and not row.spot then row.spot = spot; row.ownSpot = true end
+    -- (own, spot, ownSpot may be false: cleared, see clearNotOfferedNotes)
+    if spot and type(row.spot) ~= "table" then row.spot = spot; row.ownSpot = true end
     local old = row.own
-    if type(old) == "table" and old[1] == state and old[2] == me.level then return false end
-    row.own = { state, me.level, me.raceID or 0, me.classID or 0 }
+    if type(old) == "table" and old[1] == state and old[2] == me.level and old[5] == 1 then return false end
+    -- 5th value 1: noted by this copy (see clearNotOfferedNotes)
+    row.own = { state, me.level, me.raceID or 0, me.classID or 0, 1 }
     return true
 end
 
@@ -614,7 +660,8 @@ end
 local function pointAtPin(sp, label)
     local api = _G.EzWoWMapFinderAPI
     if api and type(api.ClearPoint) == "function" then pcall(api.ClearPoint) end
-    if api and type(api.PointAtSpawn) == "function" then
+    -- not in combat: that opens or moves the World Map from addon code
+    if api and type(api.PointAtSpawn) == "function" and not (InCombatLockdown and InCombatLockdown()) then
         local text = label or ""
         local shown = {
             kind = "npc",
@@ -636,7 +683,9 @@ local function showQuestDetails(group)
         if q.complete then quest = q break end
     end
     local questID = quest and quest.id
-    if not questID or (ns.IsGamePadUI and ns.IsGamePadUI()) then return end
+    -- in combat the quest log calls below would set or open the map from addon code
+    if not questID or (ns.IsGamePadUI and ns.IsGamePadUI())
+        or (InCombatLockdown and InCombatLockdown()) then return end
     -- a click in the quest list also guides to the quest's nearest spot: not
     -- here, the arrows stay on the clicked mark
     local guide = ns.QuestObjectivePins
@@ -919,6 +968,7 @@ local CLASS_SORTS = {
 local MAX_NPC_LINES = 6
 local LEVEL_AHEAD = 3          -- quests a few levels away are shown greyed
 local npcGives, npcTakes, prevQuest
+local npcBuiltWithoutIndex = false   -- built while the index was missing (combat)
 
 local function setAdd(map, key, value)
     local set = map[key]
@@ -941,9 +991,13 @@ local function lowerName(s)
 end
 
 local function buildNpcQuests()
-    if npcGives then return end
+    -- old wrong own notes must not show before the next talk
+    if clearNotOfferedNotes() and npcGives and QuestLogPins.resetNpcQuests then QuestLogPins.resetNpcQuests() end
+    -- an empty build made without the index is redone once the index exists
+    if npcGives and not (npcBuiltWithoutIndex and questIndex) then return end
     QuestLogPins.buildIndexes()
     npcGives, npcTakes, prevQuest = {}, {}, {}
+    npcBuiltWithoutIndex = not questIndex
     if not questIndex then return end
     for questID, entry in pairs(questIndex) do
         local spawns = entry.spawns
@@ -1487,15 +1541,28 @@ function QuestLogPins.noteOffered(npcId, offeredIDs, offeredTitles, partial, tal
     if changed and ns.RefreshQuestLogPins then pcall(ns.RefreshQuestLogPins) end
 end
 
-local function talkingNpcId()
-    for _, unit in ipairs({ "npc", "questnpc" }) do
-        local okGuid, guid = pcall(UnitGUID, unit)
-        guid = okGuid and plainValue(guid) or nil
-        local key = guid and guidToStarter(guid)
-        local id = key and tonumber(key:match("^npc:(%d+)$"))
-        if id then return id end
-    end
-    return nil
+-- NPC id of a unit; nil, true: some other unit (object, player, hidden value);
+-- nil, nil: no unit
+local function unitNpcId(unit)
+    local okGuid, guid = pcall(UnitGUID, unit)
+    if not okGuid or isSecret(guid) then return nil, true end
+    if guid == nil then return nil, nil end
+    local key = guidToStarter(guid)
+    local id = key and tonumber(key:match("^npc:(%d+)$"))
+    if id then return id, false end
+    return nil, true
+end
+
+-- the NPC the window is from; second value: some other unit is there (a game
+-- object, a player sharing a quest, a hidden value), so it is not from an NPC.
+-- The unit the window belongs to decides; "npc" may still be an earlier talk
+-- when a quest window comes from a player or an item
+local function talkingNpcId(event)
+    local first, second = "questnpc", "npc"
+    if event == "GOSSIP_SHOW" or event == "QUEST_GREETING" then first, second = "npc", "questnpc" end
+    local id, other = unitNpcId(first)
+    if other == nil then id, other = unitNpcId(second) end
+    return id, other or false
 end
 
 -- shared record kind "Q": "npcID,questID,state,level,raceID,classID[,continent,x,y]"
@@ -1503,6 +1570,7 @@ end
 if ns.Share and type(ns.Share.RegisterKind) == "function" then
     ns.Share.RegisterKind(OFFER_KIND, {
         own = function()
+            clearNotOfferedNotes()   -- old wrong own notes are not sent
             local out = {}
             for key, row in pairs(offerStore() or {}) do
                 local own = type(row) == "table" and row.own
@@ -1510,7 +1578,7 @@ if ns.Share and type(ns.Share.RegisterKind) == "function" then
                 if npcId and type(own) == "table" and OFFER_STATES[own[1]] then
                     local body = string.format("%d,%d,%d,%d,%d,%d", tonumber(npcId), tonumber(questID), own[1],
                         tonumber(own[2]) or 0, tonumber(own[3]) or 0, tonumber(own[4]) or 0)
-                    local sp = row.ownSpot and row.spot
+                    local sp = row.ownSpot == true and row.spot
                     if type(sp) == "table" and tonumber(sp[1]) and tonumber(sp[2]) and tonumber(sp[3]) then
                         body = body .. string.format(",%d,%.1f,%.1f", sp[1], sp[2], sp[3])
                     end
@@ -1546,7 +1614,7 @@ if ns.Share and type(ns.Share.RegisterKind) == "function" then
                 return false
             end
             row.peers[h] = { state, raceID, classID }
-            if spot and not row.spot then row.spot = spot end
+            if spot and type(row.spot) ~= "table" then row.spot = spot end
             return true
         end,
     })
@@ -1577,6 +1645,13 @@ local listSeenAt, listNpc = -100, nil
 -- open another page that lists more quests
 local listIDs, listTitles = {}, {}
 local closedAt = -100   -- the dialog was closed then (a new talk starts after)
+local endedAt = -100    -- the talk ended then (not just gossip -> quest window)
+-- the dialog went on to another window then (a quest window, but also a shop,
+-- trainer, flight map or bank, whose closing ends the talk unseen): the talk
+-- goes on only if a quest window opens right after
+local handOffAt = nil
+local TALK_WINDOWS = { GOSSIP_SHOW = true, QUEST_GREETING = true, QUEST_DETAIL = true,
+    QUEST_PROGRESS = true, QUEST_COMPLETE = true }
 
 local function newTalk(npcId)
     if listNpc ~= npcId or GetTime() - listSeenAt > 60 then return true end
@@ -1587,16 +1662,41 @@ end
 offerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
     if event == "GOSSIP_CLOSED" then
         closedAt = GetTime()
+        -- true: going on to another window (quest, shop, trainer, ...)
+        if arg1 ~= true then endedAt = closedAt; handOffAt = nil else handOffAt = closedAt end
+        return
+    elseif event == "QUEST_FINISHED" then
+        endedAt = GetTime()
+        handOffAt = nil
         return
     end
-    local ok = pcall(function()
-        local npcId = talkingNpcId()
-        -- a quest window opened from an NPC's dialog may not name the NPC:
-        -- the one talked to a moment ago
-        if not npcId and event ~= "GOSSIP_SHOW" and listNpc and GetTime() - listSeenAt < 60 then
-            npcId = listNpc
+    if handOffAt then
+        local since = GetTime() - handOffAt
+        if since > 1 then
+            -- no quest window came: the talk ended as the dialog closed
+            if handOffAt > endedAt then endedAt = handOffAt end
+            handOffAt = nil
+        elseif TALK_WINDOWS[event] then
+            handOffAt = nil   -- went on to this window (ended by its QUEST_FINISHED)
         end
-        if not npcId then return end
+    end
+    local ok = pcall(function()
+        local npcId, other = talkingNpcId(event)
+        -- a quest window opened from an NPC's dialog may not name the NPC:
+        -- the one talked to, while that talk is open or just ended (accepted
+        -- as the window closed). An object, a player, an item long after: not it
+        if not npcId then
+            local now = GetTime()
+            if other or event == "GOSSIP_SHOW" or not listNpc or now - listSeenAt >= 60
+                or (endedAt > listSeenAt and now - endedAt > 1) then
+                listNpc = nil
+                return
+            end
+            npcId = listNpc
+        elseif npcId ~= listNpc then
+            -- a window from another NPC: a later accept is not the old talk's
+            listNpc = nil
+        end
         local ids, titles = {}, {}
         local partial, talk = false, nil
         if event == "GOSSIP_SHOW" then
@@ -1667,7 +1767,7 @@ offerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
     if not ok then return end
 end)
 for _, event in ipairs({ "GOSSIP_SHOW", "GOSSIP_CLOSED", "QUEST_GREETING", "QUEST_DETAIL", "QUEST_ACCEPTED",
-    "QUEST_PROGRESS", "QUEST_COMPLETE" }) do
+    "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_FINISHED" }) do
     pcall(offerEvents.RegisterEvent, offerEvents, event)
 end
 

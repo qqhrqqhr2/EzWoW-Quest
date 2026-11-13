@@ -25,7 +25,7 @@
 ## Version: 1.0.16
 ## Category: EzWoW
 ## IconTexture: Interface\AddOns\EzWoW-Quest\Media\Icon
-## SavedVariables: EzWoW_QuestDB, EzWoW_SharedData
+## SavedVariables: EzWoW_QuestDB, EzWoW_SharedData, EzWoW_ShareStore_Quest
 ## OptionalDeps: EzWoW-MapFinder, EzWoW-FrameMover, EzWoW-Data
 
 Libs\EzWoWGamePad\GamePad.lua
