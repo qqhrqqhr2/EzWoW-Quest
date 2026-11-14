@@ -1,9 +1,9 @@
-# v1.0.18
+# v1.0.19
 
 ### 한국어
-- 추적기의 퀘스트나 지도의 퀘스트 표시를 누른 뒤(길 안내로 지도가 열릴 때 포함) 전투에 들어가면 "애드온 동작 차단(SetPassThroughButtons)" 오류가 나던 문제를 고쳤습니다.
-- 추적기의 퀘스트를 누르면 가장 가까운 수행 위치를 안내하고, Ctrl+클릭하면 게임의 퀘스트 로그를 엽니다. 지도의 퀘스트 표시를 누르면 웨이포인트와 화살표를 찍습니다.
+- 진행 중인 퀘스트의 목표 점이 많으면 가까운 것끼리 묶어서 보여 줍니다. 점은 항상 실제 출현 자리에 찍히고, 마우스를 올리면 묶인 자리가 모두 보이며, 지도를 확대하면 다시 풀립니다.
+- 공유 기록의 NPC·오브젝트 이름이 언어 설정에 맞게 나오도록 고쳤습니다.
 
 ### English
-- Fixed an "action blocked (SetPassThroughButtons)" error in combat after clicking a quest in the tracker or a quest mark on the map (also when the guide opened the map).
-- Clicking a quest in the tracker guides you to the nearest place to go, and Ctrl+click opens the game's quest log. Clicking a quest mark on the map sets the waypoint and arrow.
+- Objective dots of quests in progress are grouped when there are many. A dot always sits on a real spawn spot, hovering it shows every spot it stands for, and zooming in splits them again.
+- Names of NPCs and objects in shared records now follow the language setting.
