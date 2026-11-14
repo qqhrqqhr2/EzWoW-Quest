@@ -592,15 +592,16 @@ function ObjectiveTrackerController.gatherWatchedQuestRecords()
 end
 
 -----------------------------------------------------------------------------
--- Quest log overlay. Opening the world map from addon code taints its pins
--- (the map's own SetPassThroughButtons calls are then blocked in combat), so
--- a plain left click on a quest line goes through one secure button that
--- clicks a button of the game's own: the quest's header in the default
--- tracker (opens the map at the quest's details) or, when that block does not
--- exist, the quest log micro button. The overlay lies over the hovered line,
--- placed by screen position (never anchored to the tracker, which would make
--- the tracker protected), and only out of combat: it hides when combat starts.
--- Other clicks (modifiers, right button) go on to the line's own handler.
+-- Quest log overlay. Opening the world map or the quest's details from addon
+-- code taints them (the map's own SetPassThroughButtons calls are then blocked
+-- in combat), so a Ctrl+left click on a quest line goes through one secure
+-- button that clicks a button of the game's own: the quest's header in the
+-- default tracker (opens the map at the quest's details) or, when that block
+-- does not exist, the quest log micro button. The overlay lies over the
+-- hovered line, placed by screen position (never anchored to the tracker,
+-- which would make the tracker protected), and only out of combat: it hides
+-- when combat starts. Other clicks go on to the line's own handler (a plain
+-- left click guides to the nearest place to go).
 -----------------------------------------------------------------------------
 local questOverlay
 local QUEST_TRACKER_MODULES = { "QuestObjectiveTracker", "CampaignQuestObjectiveTracker" }
@@ -682,13 +683,11 @@ function ObjectiveTrackerController.ensureQuestOverlay()
         if GameTooltip then GameTooltip:Hide() end
         ObjectiveTrackerController.hideQuestOverlay()
     end)
-    -- unmodified left click: done by the secure "click" action (type1)
+    -- Ctrl+left click: the game's quest log, done by the secure "click" action
+    -- (ctrl-type1). Other clicks go on to the line's own handler.
     overlay:SetScript("PostClick", function(self, button)
-        if button == "LeftButton" and not (IsModifierKeyDown and IsModifierKeyDown()) then
-            -- after the quest log has opened: guide to the nearest place to go
-            local data = self.line and self.line.questData
-            local qop = ns.QuestObjectivePins
-            if data and data.questID and qop and qop.requestGuide then qop.requestGuide(data.questID) end
+        if button == "LeftButton" and IsControlKeyDown and IsControlKeyDown()
+            and not (IsShiftKeyDown and IsShiftKeyDown()) and not (IsAltKeyDown and IsAltKeyDown()) then
             return
         end
         local line = self.line
@@ -725,13 +724,7 @@ function ObjectiveTrackerController.showQuestOverlay(line)
     end
     local target = ObjectiveTrackerController.resolveQuestLogClickTarget(questData.questID)
     -- no block of this quest in the default tracker (it only builds what fits):
-    -- the quest log button would open the map without the quest's details, so
-    -- the line's own click opens them instead
-    -- (with the gamepad on the secure button is kept: see ns.IsGamePadUI)
-    if target and target == _G.QuestLogMicroButton and _G.QuestMapFrame and not ns.IsGamePadUI()
-        and (type(QuestMapFrame_OpenToQuestDetails) == "function" or type(QuestMapFrame_ShowQuestDetails) == "function") then
-        target = nil
-    end
+    -- the quest log button opens the quest list
     if not target then
         ObjectiveTrackerController.hideQuestOverlay()
         return
@@ -742,8 +735,11 @@ function ObjectiveTrackerController.showQuestOverlay(line)
         return
     end
     overlay:SetFrameLevel(line:GetFrameLevel() + 5)
-    overlay:SetAttribute("type1", "click")
-    overlay:SetAttribute("clickbutton1", target)
+    -- a plain click is not taken here: it goes on to the line (the guide)
+    overlay:SetAttribute("type1", nil)
+    overlay:SetAttribute("clickbutton1", nil)
+    overlay:SetAttribute("ctrl-type1", "click")
+    overlay:SetAttribute("ctrl-clickbutton1", target)
     overlay.line = line
     overlay:Show()
 end
@@ -760,8 +756,6 @@ function ObjectiveTrackerController.refreshQuestOverlay()
     end
 end
 
--- Without a secure target (or in combat, where the overlay is off) the line's
--- own click lands here.
 -- The quest log's texts for the tooltip: the short "what to do" text and the
 -- story (cut at about 360 bytes, on a whole character). nil when not readable.
 local STORY_BYTES = 360
@@ -804,24 +798,8 @@ function ObjectiveTrackerController.isSolid(savedDB)
     return savedDB.trackerShowBg ~= false and not savedDB.trackerLocked
 end
 
--- The quest's details in the World Map's quest list: with the map already open
--- only the details change, as a click in the list does; else the map opens at them.
-function ObjectiveTrackerController.openQuestOnMap(questID)
-    local list = _G.QuestMapFrame
-    if not (questID and list and WorldMapFrame) or ns.IsGamePadUI() then return false end
-    if WorldMapFrame:IsShown() and list:IsShown() and type(QuestMapFrame_ShowQuestDetails) == "function" then
-        if pcall(QuestMapFrame_ShowQuestDetails, questID) then return true end
-    end
-    if type(QuestMapFrame_OpenToQuestDetails) == "function" then
-        if pcall(QuestMapFrame_OpenToQuestDetails, questID) then return true end
-    end
-    if type(QuestMapFrame_ShowQuestDetails) == "function" then
-        if not WorldMapFrame:IsShown() and type(ShowUIPanel) == "function" then pcall(ShowUIPanel, WorldMapFrame) end
-        return pcall(QuestMapFrame_ShowQuestDetails, questID) and true or false
-    end
-    return false
-end
-
+-- Without a secure target (or in combat, where the overlay is off) the line's
+-- own click lands here.
 function ObjectiveTrackerController.launchQuestInLog(questData)
     if not questData or not questData.questID then return end
     if ObjectiveTrackerController.hasInCombat() then
@@ -834,10 +812,9 @@ function ObjectiveTrackerController.launchQuestInLog(questData)
     end
     if ns.IsGamePadUI() then return end
 
-    if type(QuestMapFrame_OpenToQuestDetails) == "function" and not _G.QuestLogFrame then
-        pcall(QuestMapFrame_OpenToQuestDetails, questData.questID)
-        return
-    end
+    -- the World Map's quest log opens only through the secure overlay: opened
+    -- from here, its pins would be blocked in combat (see showQuestOverlay)
+    if not _G.QuestLogFrame then return end
 
     local logIndex = questData.logIndex
     if (not logIndex or logIndex <= 0) and C_QuestLog and type(C_QuestLog.GetLogIndexForQuestID) == "function" then
@@ -867,8 +844,6 @@ function ObjectiveTrackerController.launchQuestInLog(questData)
         if type(QuestLog_Update) == "function" then
             pcall(QuestLog_Update)
         end
-    elseif type(ToggleQuestLog) == "function" then
-        pcall(ToggleQuestLog)
     end
 end
 
@@ -2150,26 +2125,9 @@ function ns:UpdateQuestTracker()
                                     ns.QuestShare.Share(priorityQueue.questID, priorityQueue.logIndex, false)
                                 end
                             else
-                                -- the quest's details open on the map, then the guide to the
-                                -- nearest place to go; the quest log when there is none
+                                -- the guide to the nearest place to go
                                 local qop = ns.QuestObjectivePins
-                                local questID = priorityQueue.questID
-                                local opened = false
-                                if not ObjectiveTrackerController.hasInCombat() then
-                                    opened = ObjectiveTrackerController.openQuestOnMap(questID)
-                                end
-                                local guided
-                                if opened then
-                                    -- the same as a click in the game's quest list: the guide
-                                    -- comes a moment after the details have opened
-                                    guided = true
-                                    if qop and qop.requestGuide then qop.requestGuide(questID) end
-                                else
-                                    guided = qop and qop.guideTo and qop.guideTo(questID)
-                                end
-                                if not guided and not opened then
-                                    ObjectiveTrackerController.launchQuestInLog(priorityQueue)
-                                end
+                                if qop and qop.guideTo then qop.guideTo(priorityQueue.questID) end
                             end
                         elseif button == "RightButton" then
                             if IsAltKeyDown and IsAltKeyDown() then
@@ -2375,3 +2333,4 @@ hoverWatch:SetScript("OnUpdate", function(_, elapsed)
         ns:UpdateQuestTracker()
     end
 end)
+

@@ -46,7 +46,7 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker that
 - **Hollow gold ring**: the game's own quest area, for quests without objective dots.
 - **`?` badge**: where to turn in quests whose objectives are done, a yellow `?` in a small dark badge with a gold rim (grey `?` for quests in progress, optional).
 - Only objectives with a known location are shown; guessed spots are not.
-- Nearby dots also show on the minimap. Hover for the quest and objective; click for the quest details and a waypoint (click again to remove).
+- Nearby dots also show on the minimap. Hover for the quest and objective; click for a waypoint (click again to remove).
 
 ### Quests you can take (needs EzWoW - Map Finder)
 - **`!` badge** on the World Map over NPCs with a quest you can take now. Hover for the NPC and its quests, click to set a waypoint (click again to remove). Quests given only inside the NPC's talk options get a talk bubble icon.
@@ -121,7 +121,7 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 �
 - **속이 빈 금색 고리**: 목표 위치 점이 없는 퀘스트의 퀘스트 지역(게임이 알려 주는 위치).
 - **`?` 표시**: 목표를 다 채운 퀘스트의 보고 위치. 금색 테두리의 작은 어두운 원 안에 노란 `?`(옵션을 켜면 진행 중인 퀘스트는 회색 `?`).
 - 위치가 확실한 목표만 표시하고, 짐작한 위치는 표시하지 않습니다.
-- 가까운 점은 미니맵에도 표시합니다. 마우스를 올리면 퀘스트와 목표, 클릭하면 퀘스트 내용과 웨이포인트(한 번 더 누르면 해제).
+- 가까운 점은 미니맵에도 표시합니다. 마우스를 올리면 퀘스트와 목표, 클릭하면 웨이포인트(한 번 더 누르면 해제).
 
 ### 받을 수 있는 퀘스트 (EzWoW - Map Finder 필요)
 - **`!` 표시**: 지금 받을 수 있는 퀘스트가 있는 NPC를 세계지도에 표시합니다. 마우스를 올리면 NPC와 퀘스트 목록, 클릭하면 웨이포인트(한 번 더 누르면 해제). 말풍선 대화 안에서만 주는 퀘스트는 말풍선 아이콘이 붙습니다.

@@ -950,7 +950,6 @@ local function onPinClick(self)
         end
     end
     if mark and key then mark.remember(key) end
-    if mark and quest and quest.id then mark.showDetails({ quests = { { id = quest.id } } }) end
 end
 
 -----------------------------------------------------------------------------
