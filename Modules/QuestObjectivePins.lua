@@ -100,6 +100,11 @@ local function objectiveColor(obj, quest)
     return (quest and quest.dotColor) or QUEST_COLORS[1]
 end
 local MERGE_PIXELS = 7
+-- a quest with more dots than this on one map gets its spots merged further
+-- (up to MAX_MERGE_PIXELS apart), so a crowded hunting ground stays readable
+local MAX_DOTS_PER_QUEST = 12
+local MAX_MERGE_PIXELS = 48
+local MAX_SPOTS_PER_QUEST = 2000
 local MAX_WORLD_DOTS = 700
 local MAX_MINIMAP_DOTS = 80
 local MAX_SPAWNS_PER_ENTRY = 400
@@ -971,6 +976,65 @@ local function newDisc(parent, layer, sublevel, size)
     return tex
 end
 
+-----------------------------------------------------------------------------
+-- A dot that stands for several spots shows every one of them (small dots)
+-- while the mouse is on it.
+-----------------------------------------------------------------------------
+local memberFrame
+local memberDots = {}
+local MAX_MEMBER_DOTS = 300
+
+local function hideMembers()
+    for _, tex in ipairs(memberDots) do tex:Hide() end
+end
+
+local function showMembers(pin)
+    hideMembers()
+    local group = pin.group
+    if not (group and group.members and WorldMapFrame) then return end
+    local canvasFrame = canvas()
+    local cw, ch = canvasFrame:GetWidth(), canvasFrame:GetHeight()
+    if not cw or not ch or cw <= 0 or ch <= 0 then return end
+    local cScale = (WorldMapFrame.GetCanvasScale and WorldMapFrame:GetCanvasScale()) or 1
+    if not cScale or cScale <= 0 then cScale = 1 end
+    if not memberFrame then
+        memberFrame = CreateFrame("Frame", nil, canvasFrame)
+        memberFrame:EnableMouse(false)
+    end
+    memberFrame:SetParent(canvasFrame)
+    memberFrame:ClearAllPoints()
+    memberFrame:SetAllPoints(canvasFrame)
+    memberFrame:SetFrameStrata("HIGH")
+    -- over the other dots, under the one the mouse is on (raised by raisePin)
+    memberFrame:SetFrameLevel(pin:GetFrameLevel() + 400)
+    memberFrame:Show()
+    local size = (DOT_SIZE - 1) * zoomGrow(cScale) / cScale
+    local c = group.color
+    for i, s in ipairs(group.members) do
+        if i > MAX_MEMBER_DOTS then break end
+        local x = s[1] * (cw / (group.cw or cw))
+        local y = s[2] * (ch / (group.ch or ch))
+        local border, fill = memberDots[i * 2 - 1], memberDots[i * 2]
+        if not border then
+            border = memberFrame:CreateTexture(nil, "ARTWORK", nil, 1)
+            border:SetTexture(DISC)
+            fill = memberFrame:CreateTexture(nil, "ARTWORK", nil, 2)
+            fill:SetTexture(DISC)
+            memberDots[i * 2 - 1], memberDots[i * 2] = border, fill
+        end
+        border:SetVertexColor(0, 0, 0, 0.9)
+        border:SetSize(size, size)
+        border:ClearAllPoints()
+        border:SetPoint("CENTER", memberFrame, "TOPLEFT", x, -y)
+        border:Show()
+        fill:SetVertexColor(c[1], c[2], c[3], 1)
+        fill:SetSize(size * 0.6, size * 0.6)
+        fill:ClearAllPoints()
+        fill:SetPoint("CENTER", memberFrame, "TOPLEFT", x, -y)
+        fill:Show()
+    end
+end
+
 local function obtainDot(index)
     local pin = dotPins[index]
     if pin then return pin end
@@ -983,8 +1047,16 @@ local function obtainDot(index)
     pin.border = newDisc(pin, "ARTWORK", 1, DOT_SIZE)
     pin.border:SetVertexColor(0, 0, 0, 0.95)
     pin.fill = newDisc(pin, "ARTWORK", 2, DOT_SIZE - 3)
-    pin:SetScript("OnEnter", function(self) if self.group then showGroupTooltip(self, self.group) end end)
-    pin:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    pin:SetScript("OnEnter", function(self)
+        if self.group then
+            showGroupTooltip(self, self.group)
+            showMembers(self)
+        end
+    end)
+    pin:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+        hideMembers()
+    end)
     pin:HookScript("OnEnter", raisePin)
     pin:HookScript("OnLeave", lowerPin)
     pin:SetScript("OnClick", onPinClick)
@@ -1104,6 +1176,7 @@ local function drawNets(groups, canvasFrame, cScale, baseLevel)
 end
 
 function QuestObjectivePins.hideWorld()
+    hideMembers()
     for _, pin in ipairs(dotPins) do pin:Hide() end
     for _, pin in ipairs(areaPins) do pin:Hide() end
     hideNets()
@@ -1126,6 +1199,71 @@ local function anchorPin(pin, canvasFrame, cw, ch, cScale)
     pin:SetScale(pinScale)
     pin:ClearAllPoints()
     pin:SetPoint("CENTER", canvasFrame, "TOPLEFT", px / pinScale, -py / pinScale)
+end
+
+-- Dots of one quest from its spots ({ px, py, spawn, objective } in canvas
+-- units): spots in one cell of MERGE_PIXELS screen pixels make one dot; while
+-- that leaves more than `limit` dots the cells grow (at most MAX_MERGE_PIXELS).
+-- A dot always stands on a real spot (the one nearest the middle of the spots
+-- it stands for: a monster that hides is only found right there), and keeps
+-- its spots (members) to show them while the mouse is on it.
+local function groupQuestSpots(spots, quest, cScale, cw, ch, limit)
+    local merge, groups = MERGE_PIXELS, nil
+    while true do
+        groups = {}
+        local cells = {}
+        for _, s in ipairs(spots) do
+            local key = floor(s[1] * cScale / merge) .. ":" .. floor(s[2] * cScale / merge)
+            local g = cells[key]
+            if not g then
+                g = { sx = 0, sy = 0, n = 0, members = {}, cw = cw, ch = ch, color = objectiveColor(s[4], quest),
+                    items = { { quest = quest, objectives = {} } }, seen = {} }
+                cells[key] = g
+                groups[#groups + 1] = g
+            end
+            g.sx, g.sy, g.n = g.sx + s[1], g.sy + s[2], g.n + 1
+            g.members[#g.members + 1] = s
+            if not g.seen[s[4]] then
+                g.seen[s[4]] = true
+                local objs = g.items[1].objectives
+                objs[#objs + 1] = s[4]
+            end
+        end
+        if #groups <= (limit or MAX_DOTS_PER_QUEST) or merge >= MAX_MERGE_PIXELS then break end
+        merge = math.min(MAX_MERGE_PIXELS, merge * 1.5)
+    end
+    for _, g in ipairs(groups) do
+        local mx, my = g.sx / g.n, g.sy / g.n
+        local best, bestD
+        for _, s in ipairs(g.members) do
+            local dx, dy = s[1] - mx, s[2] - my
+            local d = dx * dx + dy * dy
+            if not bestD or d < bestD then best, bestD = s, d end
+        end
+        g.px, g.py, g.spawn = best[1], best[2], best[3]
+        g.sx, g.sy = nil, nil
+        if g.n < 2 then g.members = nil end
+    end
+    return groups
+end
+
+-- the map's scale at its farthest zoom (nil when the map doesn't tell)
+local function minZoomScale()
+    local sc = WorldMapFrame and WorldMapFrame.ScrollContainer
+    if sc and sc.GetScaleForMinZoom then
+        local ok, v = pcall(sc.GetScaleForMinZoom, sc)
+        if ok and type(v) == "number" and v > 0 then return v end
+    end
+    return nil
+end
+
+-- a dot that stands for more spots is drawn a little larger
+local function dotSizeFor(n)
+    n = n or 1
+    if n >= 15 then return DOT_SIZE + 6 end
+    if n >= 7 then return DOT_SIZE + 4 end
+    if n >= 3 then return DOT_SIZE + 2 end
+    return DOT_SIZE
 end
 
 -- Spots of one objective entry on the given map (normalized coordinates).
@@ -1160,34 +1298,36 @@ function QuestObjectivePins.refreshWorld()
     if not cScale or cScale <= 0 then cScale = 1 end
     local baseLevel = canvasFrame:GetFrameLevel() or 10
 
-    -- 1) objective dots, merged per quest when closer than a few pixels
+    -- 1) objective dots: spots of one quest closer than a few pixels make one
+    -- dot (more merged when the quest has many, see groupQuestSpots)
     local dotCount = 0
     local withDots = {}
     if project and isDetailMap(mapID) then
-        local groups, cells = {}, {}
+        local spotsOf, order = {}, {}
         for _, quest in ipairs(quests) do
             for _, obj in ipairs(quest.objectives) do
                 if obj.entries and not obj.finished and spotsAllowed(obj, mapID) then
                     eachSpot(obj.entries, mapID, project, function(mx, my, sp)
-                        local px, py = mx * cw, my * ch
-                        local cx = floor(px * cScale / MERGE_PIXELS)
-                        local cy = floor(py * cScale / MERGE_PIXELS)
-                        local key = quest.id .. ":" .. cx .. ":" .. cy
-                        local group = cells[key]
-                        if not group then
-                            if #groups >= MAX_WORLD_DOTS then return end
-                            group = { px = px, py = py, cw = cw, ch = ch, spawn = sp, color = objectiveColor(obj, quest),
-                                items = { { quest = quest, objectives = {} } }, seen = {} }
-                            cells[key] = group
-                            groups[#groups + 1] = group
+                        local list = spotsOf[quest]
+                        if not list then
+                            list = {}
+                            spotsOf[quest] = list
+                            order[#order + 1] = quest
                         end
-                        if not group.seen[obj] then
-                            group.seen[obj] = true
-                            local objs = group.items[1].objectives
-                            objs[#objs + 1] = obj
-                        end
+                        if #list < MAX_SPOTS_PER_QUEST then list[#list + 1] = { mx * cw, my * ch, sp, obj } end
                     end, obj.guess)
                 end
+            end
+        end
+        -- zoomed in, more dots fit (about every spot at twice the farthest zoom)
+        local minScale = minZoomScale()
+        local zoom = (minScale and cScale > minScale) and (cScale / minScale) or 1
+        local limit = floor(MAX_DOTS_PER_QUEST * zoom * zoom * zoom)
+        local groups = {}
+        for _, quest in ipairs(order) do
+            for _, group in ipairs(groupQuestSpots(spotsOf[quest], quest, cScale, cw, ch, limit)) do
+                if #groups >= MAX_WORLD_DOTS then break end
+                groups[#groups + 1] = group
             end
         end
         for _, group in ipairs(groups) do
@@ -1198,6 +1338,10 @@ function QuestObjectivePins.refreshWorld()
             pin:SetParent(canvasFrame)
             pin:SetFrameLevel(baseLevel + 150)
             pin.group = group
+            local size = dotSizeFor(group.n)
+            pin:SetSize(size, size)
+            pin.border:SetSize(size, size)
+            pin.fill:SetSize(size - 3, size - 3)
             pin.fill:SetVertexColor(group.color[1], group.color[2], group.color[3], 1)
             anchorPin(pin, canvasFrame, cw, ch, cScale)
             pin:Show()
