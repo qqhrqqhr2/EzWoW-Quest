@@ -849,8 +849,11 @@ end
 
 function ObjectiveTrackerController.insertQuestChatLink(questData)
     if not questData then return false end
-    local editBox = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
-    if not editBox then return false end
+    local getActive = (ChatFrameUtil and ChatFrameUtil.GetActiveWindow) or ChatEdit_GetActiveWindow
+    local editBox = type(getActive) == "function" and getActive() or nil
+    -- no chat box open: the Group Finder post box takes the link while it is open
+    local takeLink = not editBox and _G.EzWoW_GroupFinderTakeLink
+    if not editBox and type(takeLink) ~= "function" then return false end
 
     local link = nil
     if type(GetQuestLink) == "function" and questData.questID then
@@ -864,8 +867,13 @@ function ObjectiveTrackerController.insertQuestChatLink(questData)
     if not link then
         link = string.format("[%d] %s", questData.level or 1, questData.title or "")
     end
-    if type(ChatEdit_InsertLink) == "function" then
-        ChatEdit_InsertLink(link)
+    if not editBox then
+        local isCallOk, used = pcall(takeLink, link)
+        return isCallOk and used == true
+    end
+    local insertLink = (ChatFrameUtil and ChatFrameUtil.InsertLink) or ChatEdit_InsertLink
+    if type(insertLink) == "function" then
+        insertLink(link)
         return true
     elseif editBox.Insert then
         editBox:Insert(link)
