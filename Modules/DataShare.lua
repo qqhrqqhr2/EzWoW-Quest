@@ -27,7 +27,14 @@ end
 
 -- map marks pick up records confirmed by other players
 local function onChanged(kinds)
-    if type(kinds) == "table" and not (kinds.quest or kinds.Q) then return end
+    if type(kinds) == "table" and not (kinds.quest or kinds.Q) then
+        -- NPC spots checked by other players (Map Finder): the quest giver
+        -- marks look for their NPCs again
+        if kinds.N and ns.QuestLogPins and ns.QuestLogPins.resetGiverSpots then
+            pcall(ns.QuestLogPins.resetGiverSpots)
+        end
+        return
+    end
     if ns.QuestLogPins and ns.QuestLogPins.resetNpcQuests then pcall(ns.QuestLogPins.resetNpcQuests) end
     if ns.QuestObjectivePins and ns.QuestObjectivePins.refreshAll then pcall(ns.QuestObjectivePins.refreshAll) end
     if ns.RefreshQuestLogPins then pcall(ns.RefreshQuestLogPins) end

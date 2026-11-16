@@ -1,15 +1,15 @@
 -- EzWoW - Quest : quest tables from EzWoW - Data when it is installed
 --
--- EzWoW - Data is optional. When it is installed, enabled and its modules have
--- the shape this addon reads (formatVersion 2):
+-- EzWoW - Data is optional. The built-in tables (this addon's levels, Map
+-- Finder's quest tables) come with every release, so they are never older than
+-- EzWoW - Data's copies and are used whenever they are there. When EzWoW - Data
+-- is installed, enabled and its modules have the shape this addon reads
+-- (formatVersion 2), its copies only stand in for missing ones:
 --   ns.QuestLevels       -> the shared quest levels (QuestLevels module, same rows as
---                           Data/QuestLevels.lua); loaded here, out of combat
---   ns.SharedQuestData   -> the shared quest tables (QuestMap module: quests, item
---                           drops, item objects, givers, turn-ins, objective spots)
---                           when Map Finder loaded them; this addon never loads them
---                           itself. ns.QuestData() returns them instead of Map
---                           Finder's copy (only while Map Finder is loaded, as before)
--- Otherwise the built-in levels and Map Finder's quest table are used as before.
+--                           Data/QuestLevels.lua) when the built-in table is empty
+--   ns.SharedQuestData   -> the shared quest tables (QuestMap module) when Map Finder
+--                           loaded them (it does only when its own are missing);
+--                           ns.QuestData() falls back to them
 -- During combat (a /reload in a fight) the built-in levels are used for that
 -- session. The shared tables are only read.
 local _, ns = ...
@@ -44,18 +44,24 @@ end
 local function useShared()
     local D = api()
     if not D then return end
-    -- levels: this addon's own module
-    local ok, available = pcall(D.IsAvailable, "QuestLevels")
-    if not (ok and available) and not inCombat() then
-        pcall(D.Load, "QuestLevels")
-    end
-    local isOk, m = pcall(D.Peek, "QuestLevels")
-    if isOk and type(m) == "table" and m.formatVersion == FORMAT_VERSION
-        and type(m.levels) == "table" and next(m.levels) ~= nil then
-        ns.QuestLevels = m.levels
-        -- who may take a quest (race, class, profession): read before Map Finder's copy
-        if type(m.requirements) == "table" and next(m.requirements) ~= nil then
-            ns.SharedQuestRequirements = m.requirements
+    -- levels: this addon's own module, loaded only when the built-in levels or
+    -- Map Finder's quest requirements are missing (they are the newer ones)
+    local builtInLevels = type(ns.QuestLevels) == "table" and next(ns.QuestLevels) ~= nil
+    local mapFinderData = type(_G.EzWoWMapFinderQuestRequirements) == "table"
+    if not (builtInLevels and mapFinderData) then
+        local ok, available = pcall(D.IsAvailable, "QuestLevels")
+        if not (ok and available) and not inCombat() then
+            pcall(D.Load, "QuestLevels")
+        end
+        local isOk, m = pcall(D.Peek, "QuestLevels")
+        if isOk and type(m) == "table" and m.formatVersion == FORMAT_VERSION
+            and type(m.levels) == "table" and next(m.levels) ~= nil then
+            if not builtInLevels then ns.QuestLevels = m.levels end
+            -- who may take a quest (race, class, profession): used only when Map
+            -- Finder has none (ns.QuestRequirements)
+            if type(m.requirements) == "table" and next(m.requirements) ~= nil then
+                ns.SharedQuestRequirements = m.requirements
+            end
         end
     end
     -- quest map tables: only when another addon (Map Finder) loads them

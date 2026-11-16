@@ -197,14 +197,49 @@ function ns.QuestLevelPrefix(questID)
     return "[" .. level .. suffix .. "] "
 end
 
+-- NPCs and objects Map Finder adds during the session (ones checked in the game
+-- that its data lacks) are taken in at the next lookup, kept apart from the
+-- data's own entries (entryByKey stays "the data has it").
+local lateByKey, indexedData, indexedCount = {}, nil, 0
+
+local function catchUpIndexes()
+    local data = indexedData
+    if type(data) ~= "table" or not entryByKey then return end
+    local n = #data
+    if n <= indexedCount then return end
+    for i = indexedCount + 1, n do
+        local e = data[i]
+        if type(e) == "table" and (e.kind == "npc" or e.kind == "object") and e.id and type(e.spawns) == "table" then
+            local key = e.kind .. ":" .. e.id
+            if not entryByKey[key] and not lateByKey[key] then lateByKey[key] = e end
+        end
+    end
+    indexedCount = n
+end
+
+-- the entry of an NPC / object: the data's, else one Map Finder added this session
+local function entryOf(kind, id)
+    if not (entryByKey and id) then return nil end
+    local key = kind .. ":" .. id
+    local e = entryByKey[key] or lateByKey[key]
+    if e then return e end
+    catchUpIndexes()
+    return lateByKey[key]
+end
+
 -- One walk over every spawn of the data: not in combat, where the client stops a
 -- script that runs too long (the index is built after login, out of combat). It is
 -- built in locals first, so a walk stopped half way leaves no partial index behind.
 function QuestLogPins.buildIndexes()
-    if questIndex or not ns.HasMapFinder() then return end
+    if questIndex then
+        catchUpIndexes()
+        return
+    end
+    if not ns.HasMapFinder() then return end
     if InCombatLockdown and InCombatLockdown() then return end
+    local data = ns.MapData()
     local quests, bySpot, byKey = {}, {}, {}
-    for _, e in ipairs(ns.MapData()) do
+    for _, e in ipairs(data) do
         if (e.kind == "npc" or e.kind == "object") and e.id and e.spawns then
             byKey[e.kind .. ":" .. e.id] = byKey[e.kind .. ":" .. e.id] or e
         end
@@ -218,6 +253,7 @@ function QuestLogPins.buildIndexes()
         end
     end
     questIndex, npcBySpot, entryByKey = quests, bySpot, byKey
+    lateByKey, indexedData, indexedCount = {}, data, #data
 end
 
 -- ready before the first fight: built a few seconds after each loading screen and
@@ -425,6 +461,20 @@ local function offerVotes(npcId, questID)
     return yes, no
 end
 
+-- true when only other players saw the NPC offer the quest (not this
+-- character, and not only the records shipped with the addons)
+local function offerFromOthers(row)
+    if type(row) ~= "table" then return false end
+    if type(row.own) == "table" and OFFER_STATES[row.own[1]] then return false end
+    local share = ns.Share
+    local isOwn = share and type(share.IsOwnHash) == "function" and share.IsOwnHash or nil
+    for h, v in pairs(type(row.peers) == "table" and row.peers or {}) do
+        local state = type(v) == "table" and v[1] or v
+        if OFFER_STATES[state] and not (isOwn and isOwn(h)) then return true end
+    end
+    return false
+end
+
 -- true when the votes say this character probably can't take it there
 local function offerSaysNo(npcId, questID, me)
     local mine = { yes = 0, no = 0 }
@@ -481,6 +531,39 @@ end
 
 -- NPC ID -> spot, for quest givers seen in the game that the data has no spot for
 local offerNpcSpots = {}
+-- "npc:ID" / "object:ID" -> the spot a giver record came with (learned here,
+-- received or built in), for givers the data has no spot for
+local giverRecordSpots = {}
+-- Q records of other players in use: NPCs shown as givers only because of them
+local offerUsed = 0
+
+local function validSpot(sp)
+    return type(sp) == "table" and type(sp[1]) == "number" and type(sp[2]) == "number" and type(sp[3]) == "number"
+end
+
+-- an object found in many places (a chest, a herb noted by mistake) is not
+-- where a quest is handed out: such an object giver gets no map mark
+local MAX_OBJECT_GIVER_SPOTS = 10
+
+-- where a quest NPC / object stands: the data's spots (or those Map Finder
+-- added this session), else the spot a record came with; nil when unknown
+local function partnerSpawns(kind, id)
+    local entry = entryOf(kind, id)
+    if entry and type(entry.spawns) == "table" and #entry.spawns > 0 then return entry.spawns end
+    local sp = (kind == "npc" and offerNpcSpots[id]) or giverRecordSpots[kind .. ":" .. id]
+    return validSpot(sp) and { sp } or nil
+end
+
+-- the name of a quest NPC / object, "#ID" when it is not known
+local function partnerName(kind, id)
+    local name
+    if ns.GetLocalizedEntityName then
+        local ok, n = pcall(ns.GetLocalizedEntityName, entryOf(kind, id) or { kind = kind, id = id })
+        if ok and type(n) == "string" and not isSecret(n) then name = n end
+    end
+    if not name or name == "" or name == tostring(id) then return "#" .. tostring(id) end
+    return name
+end
 
 local function guidToStarter(guid)
     if type(guid) ~= "string" or isSecret(guid) then return nil end
@@ -945,12 +1028,25 @@ local CLASS_SORTS = {
 local MAX_NPC_LINES = 6
 local LEVEL_AHEAD = 3          -- quests a few levels away are shown greyed
 local npcGives, npcTakes, prevQuest
+local objGives                 -- object ID -> quests it gives (a wanted poster, a book...)
 local npcBuiltWithoutIndex = false   -- built while the index was missing (combat)
 
 local function setAdd(map, key, value)
     local set = map[key]
     if not set then set = {}; map[key] = set end
     set[value] = true
+end
+
+-- a quest giver from the records: kind "npc" / "object", its ID, the quest,
+-- and the spot the record came with (used when the data has no spot for it)
+local function addGiver(kind, id, questID, spot)
+    id, questID = tonumber(id), tonumber(questID)
+    if not (id and questID) or id <= 0 or questID <= 0 then return end
+    local map = (kind == "npc" and npcGives) or (kind == "object" and objGives) or nil
+    if not map then return end
+    setAdd(map, id, questID)
+    local key = kind .. ":" .. id
+    if not giverRecordSpots[key] and validSpot(spot) then giverRecordSpots[key] = spot end
 end
 
 local function clientLoc()
@@ -973,7 +1069,8 @@ local function buildNpcQuests()
     -- an empty build made without the index is redone once the index exists
     if npcGives and not (npcBuiltWithoutIndex and questIndex) then return end
     QuestLogPins.buildIndexes()
-    npcGives, npcTakes, prevQuest = {}, {}, {}
+    npcGives, npcTakes, prevQuest, objGives = {}, {}, {}, {}
+    giverRecordSpots, offerUsed = {}, 0
     npcBuiltWithoutIndex = not questIndex
     if not questIndex then return end
     for questID, entry in pairs(questIndex) do
@@ -1005,19 +1102,35 @@ local function buildNpcQuests()
             if type(q) == "table" and q.next then prevQuest[q.next] = questID end
         end
     end
-    -- quest givers checked in the game: built-in data (givers[questID] =
-    -- { "npc", ID, ... }) and the ones learned here or shared by other players
+    -- quest givers (NPCs and objects) checked in the game: built-in data
+    -- (givers[questID] = { "npc" | "object", ID, continent, x, y }), the ones
+    -- learned here or shared by other players, and the further givers players
+    -- confirmed for the same quest
     if qd and type(qd.givers) == "table" then
         for questID, row in pairs(qd.givers) do
-            if type(row) == "table" and row[1] == "npc" and type(row[2]) == "number" then
-                setAdd(npcGives, row[2], questID)
+            if type(row) == "table" then
+                local spot = type(row[3]) == "number" and { row[3], row[4], row[5] } or nil
+                addGiver(row[1], row[2], questID, spot)
             end
         end
     end
     local learned = ns.DB and type(ns.DB.questGivers) == "table" and ns.DB.questGivers
     for questID, rec in pairs(learned or {}) do
-        local npcId = type(rec) == "table" and type(rec.key) == "string" and tonumber(rec.key:match("^npc:(%d+)$"))
-        if type(questID) == "number" and npcId then setAdd(npcGives, npcId, questID) end
+        if type(questID) == "number" and type(rec) == "table" and type(rec.key) == "string" then
+            local kind, id = rec.key:match("^(%a+):(%d+)$")
+            addGiver(kind, id, questID, rec.spot)
+        end
+    end
+    local sources = ns.QuestSources
+    local alt = sources and sources.altStore and sources.altStore("questGiversAlt")
+    for questID, row in pairs(alt or {}) do
+        if type(questID) == "number" and type(row) == "table" then
+            for key, rec in pairs(row) do
+                local kind, id
+                if type(key) == "string" then kind, id = key:match("^(%a+):(%d+)$") end
+                addGiver(kind, id, questID, type(rec) == "table" and rec.spot or nil)
+            end
+        end
     end
     -- quests an NPC was seen offering (this player or others)
     offerNpcSpots = {}
@@ -1025,7 +1138,9 @@ local function buildNpcQuests()
         local npcId, questID = tostring(key):match("^(%d+):(%d+)$")
         npcId, questID = tonumber(npcId), tonumber(questID)
         if npcId and questID and (offerVotes(npcId, questID)) > 0 then
+            local known = npcGives[npcId] and npcGives[npcId][questID]
             setAdd(npcGives, npcId, questID)
+            if not known and offerFromOthers(row) then offerUsed = offerUsed + 1 end
             if type(row) == "table" and type(row.spot) == "table" and not entryByKey["npc:" .. npcId] then
                 offerNpcSpots[npcId] = row.spot
             end
@@ -1083,20 +1198,35 @@ local function nearbyByName()
     local locNames = translations and translations[clientLoc()] and translations[clientLoc()].npc
     local names, checked = {}, {}
     local limit = NEARBY_YARDS * NEARBY_YARDS
+    -- spots: the data's, else the spot a record came with
+    local function consider(npcId, spawns)
+        if checked[npcId] or type(spawns) ~= "table" or #spawns == 0 then return end
+        checked[npcId] = true
+        local close = false
+        for _, sp in ipairs(spawns) do
+            if type(sp) == "table" and sp[1] == continent and type(sp[2]) == "number" and type(sp[3]) == "number"
+                and (sp[2] - px) ^ 2 + (sp[3] - py) ^ 2 < limit then close = true; break end
+        end
+        if close then
+            local entry = entryOf("npc", npcId)
+            local candidates = { gameNpcName(npcId), locNames and locNames[npcId], entry and entry.names and entry.names.enUS }
+            for i = 1, 3 do
+                local key = lowerName(candidates[i])
+                if key then setAdd(names, key, npcId) end
+            end
+        end
+    end
     for _, map in ipairs({ npcGives, npcTakes }) do
-        for npcId in pairs(map) do
-            if not checked[npcId] then
-                checked[npcId] = true
-                local entry = entryByKey["npc:" .. npcId]
-                local close = false
-                for _, sp in ipairs(entry and entry.spawns or {}) do
-                    if sp[1] == continent and (sp[2] - px) ^ 2 + (sp[3] - py) ^ 2 < limit then close = true; break end
-                end
-                if close then
-                    for _, name in ipairs({ gameNpcName(npcId), locNames and locNames[npcId], entry.names and entry.names.enUS }) do
-                        local key = lowerName(name)
-                        if key then setAdd(names, key, npcId) end
-                    end
+        for npcId in pairs(map) do consider(npcId, partnerSpawns("npc", npcId)) end
+    end
+    -- turn-in NPCs of finished quests from the learned / shared records
+    local sources = ns.QuestSources
+    if sources and sources.turnInEntries then
+        for _, quest in ipairs(QuestLogPins.collectQuests()) do
+            if quest.complete then
+                local ok, entries = pcall(sources.turnInEntries, quest.id)
+                for _, e in ipairs(ok and type(entries) == "table" and entries or {}) do
+                    if e.kind == "npc" and type(e.id) == "number" then consider(e.id, e.spawns) end
                 end
             end
         end
@@ -1389,21 +1519,26 @@ end
 
 -- { { text, r, g, b }, ... } for one NPC ID
 -- nowOnly: only quests that can surely be taken now (map marks)
-function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
+-- kind: "object" for a quest object (the ID is then an object ID), else an NPC
+function QuestLogPins.npcQuestLines(npcId, me, nowOnly, kind)
     buildNpcQuests()
     me = me or playerInfo()
+    local isNpc = kind ~= "object"
+    kind = isNpc and "npc" or "object"
     local found = {}
     -- finished quests turned in here: the built-in data, plus the turn-in NPC
     -- known from the learned / installed sources
     local takes = {}
-    for questID in pairs(npcTakes[npcId] or {}) do takes[questID] = true end
+    if isNpc then
+        for questID in pairs(npcTakes[npcId] or {}) do takes[questID] = true end
+    end
     local sources = ns.QuestSources
     if sources and sources.turnInEntries then
         for _, quest in ipairs(QuestLogPins.collectQuests()) do
             if quest.complete and not takes[quest.id] then
                 local ok, entries = pcall(sources.turnInEntries, quest.id)
                 for _, e in ipairs(ok and type(entries) == "table" and entries or {}) do
-                    if e.kind == "npc" and e.id == npcId then takes[quest.id] = true break end
+                    if e.kind == kind and e.id == npcId then takes[quest.id] = true break end
                 end
             end
         end
@@ -1418,7 +1553,8 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
     -- share a name (one per race or side) are listed once
     local floorLevel = QuestLogPins.trivialFloor and QuestLogPins.trivialFloor(me.level) or (me.level - 5)
     local sameName = {}
-    for questID in pairs(npcGives[npcId] or {}) do
+    local gives = ((isNpc and npcGives or objGives) or {})[npcId]
+    for questID in pairs(gives or {}) do
         local q = takeable(questID, me)
         local level = q and tonumber(q.lvl) or 0
         if q and (level <= 0 or level > floorLevel)
@@ -1431,12 +1567,12 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly)
             local again = repeatDone(questID)
             -- a condition the addon can't check (reputation, a script, an event
             -- NPC...): shown, but marked
-            if questConditional(questID, npcId, me) then
+            if questConditional(questID, isNpc and npcId or nil, me) then
                 name = ns:L("NPC_TT_CONDITION") .. " " .. name
             end
             if q.needPrev then name = ns:L("NPC_TT_PREREQ") .. " " .. name end
             -- given through a talk option, not in the NPC's first list
-            if offeredByTalk(npcId, questID) then name = TALK_ICON .. name end
+            if isNpc and offeredByTalk(npcId, questID) then name = TALK_ICON .. name end
             local text = (again and "? " or "! ") .. prefix .. name
             if (q.min or 0) > me.level then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_LEVEL"), q.min) .. ")" end
             if q.needRank then text = text .. " (" .. string.format(ns:L("NPC_TT_FROM_SKILL"), q.needRank) .. ")" end
@@ -1477,8 +1613,15 @@ local giverSpotsByMap = {}     -- mapID -> { { npcId, sp, mx, my }, ... }
 
 -- a quest giver learned or received: the NPC lists are made again
 function QuestLogPins.resetNpcQuests()
-    npcGives, npcTakes, prevQuest = nil, nil, nil
+    npcGives, npcTakes, prevQuest, objGives = nil, nil, nil, nil
     giverSpotsByMap = {}
+    nearby.names = nil
+end
+
+-- NPC spots checked by other players arrived: the giver marks look again
+function QuestLogPins.resetGiverSpots()
+    giverSpotsByMap = {}
+    nearby.names = nil
 end
 
 -- When the player talks to an NPC, the game lists the quests it offers now:
@@ -1593,6 +1736,12 @@ if ns.Share and type(ns.Share.RegisterKind) == "function" then
             row.peers[h] = { state, raceID, classID }
             if spot and type(row.spot) ~= "table" then row.spot = spot end
             return true
+        end,
+        -- how many of these records from other players are in use now: NPCs
+        -- shown as quest givers only because other players saw the offer
+        used = function()
+            buildNpcQuests()
+            return offerUsed
         end,
     })
 end
@@ -1752,13 +1901,15 @@ local function giverSpotsFor(mapID, project)
     local cached = giverSpotsByMap[mapID]
     if cached then return cached end
     cached = {}
-    for npcId in pairs(npcGives) do
-        local entry = entryByKey["npc:" .. npcId]
-        local spawns = entry and entry.spawns or (offerNpcSpots[npcId] and { offerNpcSpots[npcId] }) or {}
-        for _, sp in ipairs(spawns) do
-            local mapID2, mx, my = project(sp, mapID)
-            if mx and my and mapID2 == mapID then
-                cached[#cached + 1] = { npcId = npcId, sp = sp, mx = mx, my = my }
+    for _, kind in ipairs({ "npc", "object" }) do
+        for id in pairs((kind == "npc" and npcGives or objGives) or {}) do
+            local spawns = partnerSpawns(kind, id) or {}
+            if kind == "object" and #spawns > MAX_OBJECT_GIVER_SPOTS then spawns = {} end
+            for _, sp in ipairs(spawns) do
+                local mapID2, mx, my = project(sp, mapID)
+                if mx and my and mapID2 == mapID then
+                    cached[#cached + 1] = { kind = kind, id = id, sp = sp, mx = mx, my = my }
+                end
             end
         end
     end
@@ -1790,10 +1941,12 @@ local function takeNow(q, me, floorLevel)
 end
 QuestLogPins.takeNow = takeNow
 
-local function giverState(npcId, me)
+-- kind "npc" / "object" and its ID
+local function giverState(kind, id, me)
     local floorLevel = trivialBelow(me.level)
     local state
-    for questID in pairs(npcGives[npcId] or {}) do
+    local npcId = kind == "npc" and id or nil
+    for questID in pairs(((npcId and npcGives or objGives) or {})[id] or {}) do
         local q = takeable(questID, me)
         if takeNow(q, me, floorLevel) and questConditional(questID, npcId, me) then
             -- [condition] quests (reputation, a script, an event NPC): grey "!"
@@ -1839,11 +1992,10 @@ local function obtainGiverPin(index)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local me = playerInfo()
         local first = true
-        for _, npcId in ipairs(group.npcIds) do
-            local lines = QuestLogPins.npcQuestLines(npcId, me, true)
+        for _, giver in ipairs(group.givers) do
+            local lines = QuestLogPins.npcQuestLines(giver.id, me, true, giver.kind)
             if #lines > 0 then
-                local entry = entryByKey["npc:" .. npcId]
-                local name = entry and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(entry) or ("#" .. npcId)
+                local name = partnerName(giver.kind, giver.id)
                 if first then GameTooltip:SetText(name, unpack(Theme.accent)) else GameTooltip:AddLine(name, unpack(Theme.accent)) end
                 first = false
                 for _, l in ipairs(lines) do GameTooltip:AddLine(l.text, l.r, l.g, l.b) end
@@ -1862,9 +2014,8 @@ local function obtainGiverPin(index)
         local sp = self.group and self.group.spawn
         if clearPinWaypoint(sp) then return end
         if sp then
-            local npcId = self.group.npcIds and self.group.npcIds[1]
-            local entry = npcId and entryByKey["npc:" .. npcId]
-            local name = entry and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(entry) or ""
+            local giver = self.group.givers and self.group.givers[1]
+            local name = giver and partnerName(giver.kind, giver.id) or ""
             pointAtPin(sp, name)
             rememberPinWaypoint(sp)
         end
@@ -1886,10 +2037,11 @@ function QuestLogPins.refreshGivers(mapID, project, canvasFrame, cw, ch, cScale)
     local states = {}
     local groups = {}
     for _, spot in ipairs(giverSpotsFor(mapID, project)) do
-        local state = states[spot.npcId]
+        local key = spot.kind .. ":" .. spot.id
+        local state = states[key]
         if state == nil then
-            state = giverState(spot.npcId, me) or false
-            states[spot.npcId] = state
+            state = giverState(spot.kind, spot.id, me) or false
+            states[key] = state
         end
         if state then
             local px, py = spot.mx * cw, spot.my * ch
@@ -1901,12 +2053,12 @@ function QuestLogPins.refreshGivers(mapID, project, canvasFrame, cw, ch, cScale)
                 end
             end
             if not group then
-                group = { px = px, py = py, cw = cw, ch = ch, spawn = spot.sp, npcIds = {}, seen = {} }
+                group = { px = px, py = py, cw = cw, ch = ch, spawn = spot.sp, givers = {}, seen = {} }
                 groups[#groups + 1] = group
             end
-            if not group.seen[spot.npcId] then
-                group.seen[spot.npcId] = true
-                group.npcIds[#group.npcIds + 1] = spot.npcId
+            if not group.seen[key] then
+                group.seen[key] = true
+                group.givers[#group.givers + 1] = { kind = spot.kind, id = spot.id }
             end
             if not group.state or STATE_RANK[state] > STATE_RANK[group.state] then group.state = state end
         end
@@ -2079,8 +2231,9 @@ local function setAllWatched(watch)
     end
 end
 
--- true when some quest in the list is not checked (watched)
-local function anyUnwatched()
+-- how many quests of the list are checked (watched) and how many are not
+local function watchCounts()
+    local watchedCount, unwatchedCount = 0, 0
     for _, e in ipairs(logEntries()) do
         local info = e.info
         local questID = info.questID
@@ -2093,10 +2246,35 @@ local function anyUnwatched()
                 local ok, v = pcall(IsQuestWatched, e.index)
                 watched = ok and v and true or false
             end
-            if not watched then return true end
+            if watched then watchedCount = watchedCount + 1 else unwatchedCount = unwatchedCount + 1 end
         end
     end
-    return false
+    return watchedCount, unwatchedCount
+end
+
+-- The game watches only so many quests at once. When "check all" leaves some
+-- unchecked, the number it did check is that limit (kept in the saved data);
+-- with the limit reached the button clears the checks instead.
+local function watchLimit()
+    local saved = ns.db and tonumber(ns.db.questWatchLimit)
+    if saved and saved > 0 then return saved end
+    local c = Constants and Constants.QuestWatchConsts
+    local max = c and tonumber(c.MAX_QUEST_WATCHES)
+    return max and max > 0 and max or nil
+end
+
+-- true when "check all" can still check more quests
+local function canWatchMore()
+    local watchedCount, unwatchedCount = watchCounts()
+    if unwatchedCount == 0 then return false end
+    local limit = watchLimit()
+    return not (limit and watchedCount >= limit)
+end
+
+-- after "check all": the quests left unchecked show the game's limit
+local function noteWatchLimit()
+    local watchedCount, unwatchedCount = watchCounts()
+    if unwatchedCount > 0 and watchedCount > 0 and ns.db then ns.db.questWatchLimit = watchedCount end
 end
 
 local questLogBar
@@ -2119,7 +2297,7 @@ end
 local function refreshBar()
     if not questLogBar then return end
     questLogBar.fold.text:SetText(ns:L(anyCollapsed() and "QUESTLOG_EXPAND_ALL" or "QUESTLOG_COLLAPSE_ALL"))
-    questLogBar.check.text:SetText(ns:L(anyUnwatched() and "QUESTLOG_TRACK_ALL" or "QUESTLOG_UNTRACK_ALL"))
+    questLogBar.check.text:SetText(ns:L(canWatchMore() and "QUESTLOG_TRACK_ALL" or "QUESTLOG_UNTRACK_ALL"))
 end
 
 local function createQuestLogBar()
@@ -2137,9 +2315,15 @@ local function createQuestLogBar()
     end)
     bar.fold:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
     -- one button: checks every quest, or clears every check when all are checked
+    -- (or as many as the game watches at once)
     bar.check = barButton(bar, 78, function()
-        setAllWatched(anyUnwatched())
-        if C_Timer then C_Timer.After(0.2, refreshBar) else refreshBar() end
+        local more = canWatchMore()
+        setAllWatched(more)
+        local function after()
+            if more then noteWatchLimit() end
+            refreshBar()
+        end
+        if C_Timer then C_Timer.After(0.2, after) else after() end
     end)
     bar.check:SetPoint("TOPLEFT", bar.fold, "BOTTOMLEFT", 0, -4)
     questLogBar = bar

@@ -8,7 +8,8 @@
 --    - the spot where an "event" objective (reach a place, scout an area)
 --      was completed.
 --    Records confirmed by other players of this addon (Modules/DataShare.lua)
---    are kept the same way.
+--    are kept the same way, and so are further turn-ins players confirmed
+--    for the same quest (several innkeepers, say).
 -- 2. The built-in data the updater makes from such records (Map Finder's
 --    quest table: turnIns, eventSpots).
 -- Spots are { continent, worldX, worldY } like Map Finder's location data.
@@ -72,18 +73,26 @@ end
 -----------------------------------------------------------------------------
 -- Map Finder entries by kind and ID
 -----------------------------------------------------------------------------
-local ownByKey
+-- Entries Map Finder adds later in the session (NPCs checked in the game that
+-- its data lacks) are taken in at the next lookup.
+local ownByKey, ownData, ownCount
 
 local function ownEntry(kind, id)
     if not ownByKey then
         if not (ns.HasMapFinder and ns.HasMapFinder()) then return nil end
-        ownByKey = {}
-        for _, e in ipairs(ns.MapData()) do
-            if (e.kind == "npc" or e.kind == "object") and e.id and type(e.spawns) == "table" and #e.spawns > 0 then
+        ownByKey, ownData, ownCount = {}, ns.MapData(), 0
+    end
+    local n = #ownData
+    if n > ownCount then
+        for i = ownCount + 1, n do
+            local e = ownData[i]
+            if type(e) == "table" and (e.kind == "npc" or e.kind == "object") and e.id and type(e.spawns) == "table"
+                and #e.spawns > 0 then
                 local key = e.kind .. ":" .. e.id
                 ownByKey[key] = ownByKey[key] or e
             end
         end
+        ownCount = n
     end
     return ownByKey[kind .. ":" .. id]
 end
@@ -103,6 +112,8 @@ local function nameOf(e)
         if ok and type(n) == "string" and n ~= "" and not isSecret(n) then name = n end
     end
     if not name and e.names then name = e.names.enUS end
+    -- (a name the game doesn't know comes back as the bare ID)
+    if name == tostring(e.id) then name = nil end
     return name
 end
 QuestSources.nameOf = nameOf
@@ -131,25 +142,77 @@ local function turnInFrom(kind, id, spot)
     return nil
 end
 
+-- Other givers / turn-ins players confirmed for a quest besides the stored one
+-- (a quest handed in at any of several innkeepers), kept by the shared records:
+-- questGiversAlt / questEndersAlt [questID] =
+--   { ["npc:ID" | "object:ID"] = { spot = { continent, x, y } or nil, n = players } }
+-- nil when there are none (older shared records have no such table).
+function QuestSources.altStore(key)
+    local t = ns.DB and ns.DB[key]
+    if type(t) ~= "table" then
+        local share = ns.Share
+        local ok, data = false, nil
+        if share and type(share.Data) == "function" then ok, data = pcall(share.Data) end
+        t = ok and type(data) == "table" and type(data.quest) == "table" and data.quest[key] or nil
+    end
+    return type(t) == "table" and t or nil
+end
+
+-- one quest's other givers / turn-ins: { { kind = "npc" | "object", id, spot }, ... }
+function QuestSources.altPartners(key, questID)
+    local out = {}
+    local store = QuestSources.altStore(key)
+    local row = store and store[questID]
+    if type(row) ~= "table" then return out end
+    for partner, rec in pairs(row) do
+        local kind, id
+        if type(partner) == "string" then kind, id = partner:match("^(%a+):(%d+)$") end
+        id = tonumber(id)
+        if (kind == "npc" or kind == "object") and id and id > 0 then
+            local spot = type(rec) == "table" and rec.spot or nil
+            out[#out + 1] = { kind = kind, id = id, spot = isSpot(spot) and spot or nil }
+        end
+    end
+    -- the same order every time
+    table.sort(out, function(a, b)
+        if a.kind ~= b.kind then return a.kind < b.kind end
+        return a.id < b.id
+    end)
+    return out
+end
+
 -- Returns a list of entries (each with spawns) where the quest is turned in,
 -- or nil when neither source knows it.
 function QuestSources.turnInEntries(questID)
+    local list, mainKey
     -- learned by this character (or confirmed by other players)
     local learned = ns.DB and type(ns.DB.questEnders) == "table" and ns.DB.questEnders[questID]
     if type(learned) == "table" then
         local kind, id
         if type(learned.key) == "string" then kind, id = learned.key:match("^(%a+):(%d+)$") end
-        local list = turnInFrom(kind, id, learned.spot)
-        if list then return list end
+        list = turnInFrom(kind, id, learned.spot)
+        if list and kind and tonumber(id) then mainKey = kind .. ":" .. tonumber(id) end
     end
     -- built-in data: turnIns[questID] = { "npc" | "object", ID, continent, x, y }
-    local qd = builtInQuestData()
-    local row = qd and type(qd.turnIns) == "table" and qd.turnIns[questID]
-    if type(row) == "table" then
-        local list = turnInFrom(row[1], row[2], row[3] and { row[3], row[4], row[5] })
-        if list then return list end
+    if not list then
+        local qd = builtInQuestData()
+        local row = qd and type(qd.turnIns) == "table" and qd.turnIns[questID]
+        if type(row) == "table" then
+            list = turnInFrom(row[1], row[2], row[3] and { row[3], row[4], row[5] })
+            if list then mainKey = tostring(row[1]) .. ":" .. tostring(tonumber(row[2])) end
+        end
     end
-    return nil
+    -- the other turn-ins players confirmed
+    for _, alt in ipairs(QuestSources.altPartners("questEndersAlt", questID)) do
+        if alt.kind .. ":" .. alt.id ~= mainKey then
+            local more = turnInFrom(alt.kind, alt.id, alt.spot)
+            if more then
+                list = list or {}
+                list[#list + 1] = more[1]
+            end
+        end
+    end
+    return list
 end
 
 -----------------------------------------------------------------------------

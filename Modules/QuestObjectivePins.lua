@@ -312,21 +312,36 @@ local npcByWord      -- last word of an NPC name (lower case) -> { entry, ... }
 -- guesses are drawn only inside the quest's own zone, so this is just a safety cap
 local MAX_GUESS_ENTRIES = 80
 
-local function buildDropIndexes()
-    if npcById then return end
-    QuestObjectivePins.buildNameIndex()
-    npcById, npcByWord, objectById, itemById = {}, {}, {}, {}
-    for _, e in ipairs(ns.MapData()) do
-        if e.id and type(e.spawns) == "table" and #e.spawns > 0 then
-            if e.kind == "npc" then
-                npcById[e.id] = npcById[e.id] or e
-            elseif e.kind == "object" then
-                objectById[e.id] = objectById[e.id] or e
-            elseif e.kind == "item" then
-                itemById[e.id] = itemById[e.id] or e
-            end
+-- the data table indexed and how far: NPCs Map Finder adds later in the
+-- session (looted or talked to, the data lacks them) are taken in as they come
+local dropData, dropCount = nil, 0
+
+local function addDropEntry(e)
+    if type(e) == "table" and e.id and type(e.spawns) == "table" and #e.spawns > 0 then
+        if e.kind == "npc" then
+            npcById[e.id] = npcById[e.id] or e
+        elseif e.kind == "object" then
+            objectById[e.id] = objectById[e.id] or e
+        elseif e.kind == "item" then
+            itemById[e.id] = itemById[e.id] or e
         end
     end
+end
+
+local function buildDropIndexes()
+    if npcById then
+        local n = type(dropData) == "table" and #dropData or 0
+        if n > dropCount then
+            for i = dropCount + 1, n do addDropEntry(dropData[i]) end
+            dropCount = n
+        end
+        return
+    end
+    QuestObjectivePins.buildNameIndex()
+    npcById, npcByWord, objectById, itemById = {}, {}, {}, {}
+    local data = ns.MapData()
+    for _, e in ipairs(data) do addDropEntry(e) end
+    dropData, dropCount = data, #data
     for name, list in pairs(nameIndex.npc) do
         local last = name:match("(%S+)$")
         if last then
@@ -797,6 +812,30 @@ local function placeHints(questID)
     return result
 end
 
+-- Two lists of places as one new list (neither list is changed: one may be the
+-- name index's own). The same creature, or the same object at the same spot,
+-- is kept once.
+local function mergeEntries(first, second)
+    if not first then return second end
+    if not second then return first end
+    local out, seen = {}, {}
+    for _, list in ipairs({ first, second }) do
+        for _, e in ipairs(list) do
+            local sp = type(e.spawns) == "table" and e.spawns[1]
+            local key = tostring(e.kind) .. ":" .. tostring(e.id)
+            if e.kind == "object" and type(sp) == "table" and type(sp[1]) == "number"
+                and type(sp[2]) == "number" and type(sp[3]) == "number" then
+                key = key .. ":" .. spotKeyOf(sp)
+            end
+            if not seen[e] and not seen[key] then
+                seen[e], seen[key] = true, true
+                out[#out + 1] = e
+            end
+        end
+    end
+    return out
+end
+
 function QuestObjectivePins.rebuildQuests()
     quests, questByID = {}, {}
     if not enabled() then return end
@@ -830,9 +869,11 @@ function QuestObjectivePins.rebuildQuests()
                             obj.itemID = dataObj[2]
                         end
                         local learned = obj.itemKey and learnedDropEntries(obj.itemKey)
-                        -- no guessed spots (creatures named like the item): they were often wrong
+                        -- no guessed spots (creatures named like the item): they were often wrong.
+                        -- What is known by the item's name (looted here, or from other players)
+                        -- goes with the places known by its ID (built-in data, records by ID).
                         if learned then
-                            obj.entries = learned
+                            obj.entries = mergeEntries(obj.entries, learned)
                         end
                     end
                 elseif not obj.finished and obj.type == "event" and sources then

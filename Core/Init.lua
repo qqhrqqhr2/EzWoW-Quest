@@ -213,22 +213,25 @@ function ns.MapTranslations()
     return type(t) == "table" and t or nil
 end
 
--- quest tables: the shared ones from EzWoW - Data (Data/SharedData.lua) when
--- loaded, else Map Finder's. Both only while Map Finder is loaded, so the
--- marks are the same with and without EzWoW - Data.
--- [questID] = { races, classes, skill, skill rank }: EzWoW - Data's copy when
--- it is installed (Data/SharedData.lua), else Map Finder's (nil without both)
+-- quest tables: Map Finder's (they come with every Map Finder release, so they
+-- are never older than EzWoW - Data's copy); the shared ones from EzWoW - Data
+-- (Data/SharedData.lua) only when Map Finder has none. Both only while Map
+-- Finder is loaded, so the marks are the same with and without EzWoW - Data.
+-- [questID] = { races, classes, skill, skill rank }: Map Finder's, else EzWoW -
+-- Data's copy (Data/SharedData.lua; nil without both)
 function ns.QuestRequirements()
-    if type(ns.SharedQuestRequirements) == "table" then return ns.SharedQuestRequirements end
     local api = ns.MapAPI()
     local r = api and type(api.GetQuestRequirements) == "function" and api.GetQuestRequirements()
+    if type(r) == "table" and next(r) ~= nil then return r end
+    if type(ns.SharedQuestRequirements) == "table" then return ns.SharedQuestRequirements end
     return type(r) == "table" and r or nil
 end
 
 function ns.QuestData()
     local api = ns.MapAPI()
-    if api and type(ns.SharedQuestData) == "table" then return ns.SharedQuestData end
     local q = api and type(api.GetQuestData) == "function" and api.GetQuestData()
+    if type(q) == "table" and type(q.quests) == "table" and next(q.quests) ~= nil then return q end
+    if api and type(ns.SharedQuestData) == "table" then return ns.SharedQuestData end
     return type(q) == "table" and q or nil
 end
 
