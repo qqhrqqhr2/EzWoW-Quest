@@ -273,7 +273,10 @@ function ObjectiveTrackerController.onUserWatchQuest(questID)
     if meta and meta.zoneName and savedDB.trackerCollapsedZones then
         savedDB.trackerCollapsedZones[meta.zoneName] = nil
     end
-    lastWatchedState[questID] = true
+    -- the game watches only so many quests at once (20): one it refused stays in
+    -- this tracker (the player checked it) instead of being hidden as "unchecked"
+    -- at the next update, so this tracker holds every checked quest
+    lastWatchedState[questID] = ObjectiveTrackerController.hasClientQuestWatched(questID) and true or false
     ns:ScheduleTrackerUpdate()
 end
 
@@ -419,6 +422,7 @@ function ObjectiveTrackerController.gatherWatchedQuestRecords()
     local seenZone = {}
     local seenQuest = {}
     local totalActiveQuests = 0
+    local listedQuests = 0      -- quests this tracker lists (after hidden / watched only)
 
     local function addQuestRecord(questID, logIndex, title, level, zoneName, isComplete, tagSuffix)
         if not questID or seenQuest[questID] then return end
@@ -449,6 +453,7 @@ function ObjectiveTrackerController.gatherWatchedQuestRecords()
         else
             if not watched or hiddenQuests[questID] then return end
         end
+        listedQuests = listedQuests + 1
 
         local zName = (zoneName and zoneName ~= "") and zoneName or ns:L("TRACKER_OTHER_ZONE")
         if not seenZone[zName] then
@@ -588,7 +593,7 @@ function ObjectiveTrackerController.gatherWatchedQuestRecords()
         end
     end
 
-    return zoneOrder, zones, totalActiveQuests
+    return zoneOrder, zones, totalActiveQuests, listedQuests
 end
 
 -----------------------------------------------------------------------------
@@ -1933,12 +1938,14 @@ function ns:UpdateQuestTracker()
     end
 
     local userWidth, userBodyHeight = ObjectiveTrackerController.resolveTrackerDimensions()
-    local zoneOrder, zones, totalActive = ObjectiveTrackerController.gatherWatchedQuestRecords()
+    local zoneOrder, zones, totalActive, listed = ObjectiveTrackerController.gatherWatchedQuestRecords()
     local maxQuests = ObjectiveTrackerController.resolveMaxQuests()
     local expanded = savedDB.trackerExpanded ~= false
     local presentZoneAndLevel = savedDB.trackerShowZone ~= false
 
-    local baseTitle = string.format("EzWoW - Quest  |cffa7b9c5%d/%d|r", totalActive, maxQuests)
+    -- quests in the log / most the log takes, then how many of them this list shows
+    local baseTitle = string.format("EzWoW - Quest  |cffa7b9c5%d/%d|r  |cff8fd3ff%s|r", totalActive, maxQuests,
+        string.format(ns:L("TRACKER_LISTED"), listed or 0))
     if hasResizingTracker then
         headerBtn.text:SetText(string.format("%s (%d×%d)", baseTitle, userWidth, userBodyHeight))
     else

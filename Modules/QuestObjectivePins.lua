@@ -36,18 +36,49 @@ local function setPropagateClicks(frame, value)
     frame:SetPropagateMouseClicks(value)
 end
 
--- The hovered mark comes to the front of marks that overlap it, and goes back
--- to its own level when the mouse leaves.
-local function raisePin(self)
-    if self.ezBaseLevel == nil then self.ezBaseLevel = self:GetFrameLevel() end
-    self:SetFrameLevel(self.ezBaseLevel + 500)
-end
-local function lowerPin(self)
-    if self.ezBaseLevel ~= nil then
-        self:SetFrameLevel(self.ezBaseLevel)
-        self.ezBaseLevel = nil
+-- One mark of all EzWoW map marks is in front: the last one the mouse was on
+-- (above every other mark, its label too). It stays in front after the mouse
+-- leaves, until another mark is hovered; the one before goes back to its place.
+-- Kept in a table all EzWoW addons share (EzWoWMapPinFront).
+local function mapPinFront()
+    local f = _G.EzWoWMapPinFront
+    if type(f) == "table" and (tonumber(f.v) or 0) >= 2 then return f end
+    f = { v = 2 }
+    local STRATA = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5, FULLSCREEN = 6,
+        FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
+    function f.Restore(pin)
+        if not pin then return end
+        if pin.ezBaseLevel ~= nil then
+            if pin.ezBaseStrata then pcall(pin.SetFrameStrata, pin, pin.ezBaseStrata) end
+            -- a level its addon gave it since (the marks were drawn again) stays
+            if pin:GetFrameLevel() == pin.ezFrontLevel then pcall(pin.SetFrameLevel, pin, pin.ezBaseLevel) end
+        end
+        pin.ezBaseLevel, pin.ezBaseStrata, pin.ezFrontLevel = nil, nil, nil
+        if f.pin == pin then f.pin = nil end
     end
+    function f.Raise(pin)
+        if not pin then return end
+        if f.pin == pin then
+            if pin:GetFrameLevel() == pin.ezFrontLevel then return end
+            -- drawn again at its own level since it came to the front: raised from there
+            pin.ezBaseLevel = pin:GetFrameLevel()
+        else
+            if f.pin then f.Restore(f.pin) end
+            pin.ezBaseLevel, pin.ezBaseStrata = pin:GetFrameLevel(), pin:GetFrameStrata()
+            f.pin = pin
+        end
+        -- the marks of the quest addons sit in HIGH: at least that layer
+        if (STRATA[pin.ezBaseStrata] or 0) < STRATA.HIGH then pcall(pin.SetFrameStrata, pin, "HIGH") end
+        local parent = pin:GetParent()
+        pcall(pin.SetFrameLevel, pin, ((parent and parent:GetFrameLevel()) or 0) + 1200)
+        pin.ezFrontLevel = pin:GetFrameLevel()
+    end
+    _G.EzWoWMapPinFront = f
+    return f
 end
+local function raisePin(self) mapPinFront().Raise(self) end
+-- (the mark stays in front when the mouse leaves)
+local function lowerPin() end
 
 -- Marks grow a little when the map is zoomed in (less than the map itself,
 -- at most 3x), so they stay readable without covering the map.
@@ -99,7 +130,7 @@ local COLOR_TITLE = { 1.00, 0.82, 0.00 }
 local function objectiveColor(obj, quest)
     return (quest and quest.dotColor) or QUEST_COLORS[1]
 end
-local MERGE_PIXELS = 7
+local MERGE_PIXELS = 12
 -- a quest with more dots than this on one map gets its spots merged further
 -- (up to MAX_MERGE_PIXELS apart), so a crowded hunting ground stays readable
 local MAX_DOTS_PER_QUEST = 12
@@ -1243,23 +1274,43 @@ local function anchorPin(pin, canvasFrame, cw, ch, cScale)
 end
 
 -- Dots of one quest from its spots ({ px, py, spawn, objective } in canvas
--- units): spots in one cell of MERGE_PIXELS screen pixels make one dot; while
--- that leaves more than `limit` dots the cells grow (at most MAX_MERGE_PIXELS).
--- A dot always stands on a real spot (the one nearest the middle of the spots
--- it stands for: a monster that hides is only found right there), and keeps
--- its spots (members) to show them while the mouse is on it.
+-- units): a spot within MERGE_PIXELS screen pixels of a dot's first spot joins
+-- that dot, so no two dots touch (cells of a grid used to leave dots side by
+-- side across a cell border); while that leaves more than `limit` dots the
+-- distance grows (at most MAX_MERGE_PIXELS). A dot always stands on a real
+-- spot (the one nearest the middle of the spots it stands for: a monster that
+-- hides is only found right there), and keeps its spots (members) to show
+-- them while the mouse is on it.
 local function groupQuestSpots(spots, quest, cScale, cw, ch, limit)
     local merge, groups = MERGE_PIXELS, nil
     while true do
         groups = {}
-        local cells = {}
+        local cells = {}       -- "cx:cy" -> dots whose first spot is in that cell
+        local reach = merge * merge
         for _, s in ipairs(spots) do
-            local key = floor(s[1] * cScale / merge) .. ":" .. floor(s[2] * cScale / merge)
-            local g = cells[key]
+            local x, y = s[1] * cScale, s[2] * cScale
+            local cx, cy = floor(x / merge), floor(y / merge)
+            local g
+            for ox = -1, 1 do
+                for oy = -1, 1 do
+                    for _, cand in ipairs(cells[(cx + ox) .. ":" .. (cy + oy)] or {}) do
+                        local dx, dy = cand.ax - x, cand.ay - y
+                        if dx * dx + dy * dy <= reach then g = cand break end
+                    end
+                    if g then break end
+                end
+                if g then break end
+            end
             if not g then
                 g = { sx = 0, sy = 0, n = 0, members = {}, cw = cw, ch = ch, color = objectiveColor(s[4], quest),
-                    items = { { quest = quest, objectives = {} } }, seen = {} }
-                cells[key] = g
+                    items = { { quest = quest, objectives = {} } }, seen = {}, ax = x, ay = y }
+                local key = cx .. ":" .. cy
+                local list = cells[key]
+                if not list then
+                    list = {}
+                    cells[key] = list
+                end
+                list[#list + 1] = g
                 groups[#groups + 1] = g
             end
             g.sx, g.sy, g.n = g.sx + s[1], g.sy + s[2], g.n + 1
@@ -1282,7 +1333,7 @@ local function groupQuestSpots(spots, quest, cScale, cw, ch, limit)
             if not bestD or d < bestD then best, bestD = s, d end
         end
         g.px, g.py, g.spawn = best[1], best[2], best[3]
-        g.sx, g.sy = nil, nil
+        g.sx, g.sy, g.ax, g.ay = nil, nil, nil, nil
         if g.n < 2 then g.members = nil end
     end
     return groups

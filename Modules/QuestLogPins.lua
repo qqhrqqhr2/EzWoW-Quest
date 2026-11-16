@@ -110,18 +110,49 @@ local function setPropagateClicks(frame, value)
     frame:SetPropagateMouseClicks(value)
 end
 
--- The hovered mark comes to the front of marks that overlap it, and goes back
--- to its own level when the mouse leaves.
-local function raisePin(self)
-    if self.ezBaseLevel == nil then self.ezBaseLevel = self:GetFrameLevel() end
-    self:SetFrameLevel(self.ezBaseLevel + 500)
-end
-local function lowerPin(self)
-    if self.ezBaseLevel ~= nil then
-        self:SetFrameLevel(self.ezBaseLevel)
-        self.ezBaseLevel = nil
+-- One mark of all EzWoW map marks is in front: the last one the mouse was on
+-- (above every other mark, its label too). It stays in front after the mouse
+-- leaves, until another mark is hovered; the one before goes back to its place.
+-- Kept in a table all EzWoW addons share (EzWoWMapPinFront).
+local function mapPinFront()
+    local f = _G.EzWoWMapPinFront
+    if type(f) == "table" and (tonumber(f.v) or 0) >= 2 then return f end
+    f = { v = 2 }
+    local STRATA = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5, FULLSCREEN = 6,
+        FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
+    function f.Restore(pin)
+        if not pin then return end
+        if pin.ezBaseLevel ~= nil then
+            if pin.ezBaseStrata then pcall(pin.SetFrameStrata, pin, pin.ezBaseStrata) end
+            -- a level its addon gave it since (the marks were drawn again) stays
+            if pin:GetFrameLevel() == pin.ezFrontLevel then pcall(pin.SetFrameLevel, pin, pin.ezBaseLevel) end
+        end
+        pin.ezBaseLevel, pin.ezBaseStrata, pin.ezFrontLevel = nil, nil, nil
+        if f.pin == pin then f.pin = nil end
     end
+    function f.Raise(pin)
+        if not pin then return end
+        if f.pin == pin then
+            if pin:GetFrameLevel() == pin.ezFrontLevel then return end
+            -- drawn again at its own level since it came to the front: raised from there
+            pin.ezBaseLevel = pin:GetFrameLevel()
+        else
+            if f.pin then f.Restore(f.pin) end
+            pin.ezBaseLevel, pin.ezBaseStrata = pin:GetFrameLevel(), pin:GetFrameStrata()
+            f.pin = pin
+        end
+        -- the marks of the quest addons sit in HIGH: at least that layer
+        if (STRATA[pin.ezBaseStrata] or 0) < STRATA.HIGH then pcall(pin.SetFrameStrata, pin, "HIGH") end
+        local parent = pin:GetParent()
+        pcall(pin.SetFrameLevel, pin, ((parent and parent:GetFrameLevel()) or 0) + 1200)
+        pin.ezFrontLevel = pin:GetFrameLevel()
+    end
+    _G.EzWoWMapPinFront = f
+    return f
 end
+local function raisePin(self) mapPinFront().Raise(self) end
+-- (the mark stays in front when the mouse leaves)
+local function lowerPin() end
 
 -- Marks grow a little when the map is zoomed in (less than the map itself,
 -- at most 3x), so they stay readable without covering the map.
@@ -2253,11 +2284,13 @@ local function watchCounts()
 end
 
 -- The game watches only so many quests at once. When "check all" leaves some
--- unchecked, the number it did check is that limit (kept in the saved data);
--- with the limit reached the button clears the checks instead.
+-- unchecked, the number it did check is taken as that limit for this session
+-- (the largest seen; not saved: a quest left unchecked for another reason would
+-- otherwise keep a limit too low); with the limit reached the button clears the
+-- checks instead.
+local sessionWatchLimit
 local function watchLimit()
-    local saved = ns.db and tonumber(ns.db.questWatchLimit)
-    if saved and saved > 0 then return saved end
+    if sessionWatchLimit and sessionWatchLimit > 0 then return sessionWatchLimit end
     local c = Constants and Constants.QuestWatchConsts
     local max = c and tonumber(c.MAX_QUEST_WATCHES)
     return max and max > 0 and max or nil
@@ -2274,7 +2307,9 @@ end
 -- after "check all": the quests left unchecked show the game's limit
 local function noteWatchLimit()
     local watchedCount, unwatchedCount = watchCounts()
-    if unwatchedCount > 0 and watchedCount > 0 and ns.db then ns.db.questWatchLimit = watchedCount end
+    if unwatchedCount > 0 and watchedCount > (sessionWatchLimit or 0) then sessionWatchLimit = watchedCount end
+    -- (a limit an older version saved is let go)
+    if ns.db then ns.db.questWatchLimit = nil end
 end
 
 local questLogBar
@@ -2289,8 +2324,22 @@ local function barButton(parent, width, onClick)
     b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     b.text:SetPoint("CENTER")
     b:SetScript("OnClick", onClick)
-    b:SetScript("OnEnter", function(self) if self.SetBackdropBorderColor then self:SetBackdropBorderColor(0.94, 0.72, 0.42, 1) end end)
-    b:SetScript("OnLeave", function(self) if self.SetBackdropBorderColor then self:SetBackdropBorderColor(0.20, 0.30, 0.36, 1) end end)
+    -- the tooltip: the button's label, what it does (tipKey() gives the text's
+    -- key for the button's current state) and the addon's name
+    b:SetScript("OnEnter", function(self)
+        if self.SetBackdropBorderColor then self:SetBackdropBorderColor(0.94, 0.72, 0.42, 1) end
+        if not (GameTooltip and self.tipKey) then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(self.text:GetText() or "", unpack(Theme.accent))
+        GameTooltip:AddLine(ns:L(self.tipKey()), 1, 1, 1, true)
+        GameTooltip:AddDoubleLine(" ", "EzWoW - Quest", 0, 0, 0, 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+        if _G.EzWoWTooltipTagSizer and _G.EzWoWTooltipTagSizer.Refit then pcall(_G.EzWoWTooltipTagSizer.Refit, GameTooltip) end
+    end)
+    b:SetScript("OnLeave", function(self)
+        if self.SetBackdropBorderColor then self:SetBackdropBorderColor(0.20, 0.30, 0.36, 1) end
+        if GameTooltip and GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end)
     return b
 end
 
@@ -2298,6 +2347,10 @@ local function refreshBar()
     if not questLogBar then return end
     questLogBar.fold.text:SetText(ns:L(anyCollapsed() and "QUESTLOG_EXPAND_ALL" or "QUESTLOG_COLLAPSE_ALL"))
     questLogBar.check.text:SetText(ns:L(canWatchMore() and "QUESTLOG_TRACK_ALL" or "QUESTLOG_UNTRACK_ALL"))
+    -- a tooltip open on a button follows its new label
+    for _, b in ipairs({ questLogBar.fold, questLogBar.check }) do
+        if GameTooltip and GameTooltip:IsOwned(b) then b:GetScript("OnEnter")(b) end
+    end
 end
 
 local function createQuestLogBar()
@@ -2314,6 +2367,7 @@ local function createQuestLogBar()
         refreshBar()
     end)
     bar.fold:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+    bar.fold.tipKey = function() return anyCollapsed() and "QUESTLOG_EXPAND_TIP" or "QUESTLOG_COLLAPSE_TIP" end
     -- one button: checks every quest, or clears every check when all are checked
     -- (or as many as the game watches at once)
     bar.check = barButton(bar, 78, function()
@@ -2326,6 +2380,7 @@ local function createQuestLogBar()
         if C_Timer then C_Timer.After(0.2, after) else after() end
     end)
     bar.check:SetPoint("TOPLEFT", bar.fold, "BOTTOMLEFT", 0, -4)
+    bar.check.tipKey = function() return canWatchMore() and "QUESTLOG_TRACK_TIP" or "QUESTLOG_UNTRACK_TIP" end
     questLogBar = bar
     local function sync() bar:SetShown(list:IsShown()); refreshBar() end
     list:HookScript("OnShow", sync)
