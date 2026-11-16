@@ -1,11 +1,21 @@
-# v1.0.22
+# v1.0.23
 
 ### 한국어
-- 데이터 공유 방식을 새로 바꿨습니다. 같은 기록을 되풀이해 보내지 않고 상대에게 없는 기록만 주고받아, 공유로 오가는 메시지가 크게 줄었습니다. 예전 버전을 쓰는 사람과도 계속 공유됩니다.
-- 공유 기록의 확인 대기 공간에 남아 있던 이미 확인된 기록을 정리해 저장 데이터가 줄었습니다.
-- /ezshare 창의 사람 탭에서 상대가 쓰는 공유 버전과 EzWoW 애드온 버전을 볼 수 있습니다.
+- EzWoW-Data가 깔려 있으면 예전 데이터가 쓰이던 문제를 고쳤습니다. 애드온에 든 최신 데이터를 먼저 씁니다.
+- `/ezshare` 창 "종류별" 탭에서 다른 사용자에게 받아 지금 쓰고 있는 기록 수와 보이는 곳을 볼 수 있습니다.
+- 퀘스트를 받거나 완료하는 NPC가 여럿이면(여관주인 등) 모두 표시합니다.
+- 게시판·책 같은 물체가 주는 퀘스트도 지도에 "!"로 표시합니다.
+- 지도 데이터에 없는 NPC가 주는 퀘스트도 기록된 위치에 "!"를 표시합니다.
+- 퀘스트 아이템 목표에 드롭 몬스터와 주운 자리를 함께 표시합니다.
+- 공유 기록 옵션 설명을 실제 규칙에 맞게 고쳤습니다.
+- 퀘스트가 많아 게임이 추적할 수 있는 수를 넘으면 "모두 체크" 뒤에 "모두 해제"가 나오지 않던 문제를 고쳤습니다.
 
 ### English
-- Data sharing works in a new way: records are no longer sent again and again, only what the other player does not have yet, so far fewer sharing messages go around. Sharing with players on older versions continues.
-- Records already confirmed are cleared from the shared-data waiting list, so the saved data is smaller.
-- The Players tab of the /ezshare window shows each player's sharing version and EzWoW addon versions.
+- Fixed older data being used when EzWoW-Data is installed; the addon's own, newer data now comes first.
+- The /ezshare "By kind" tab now shows how many records from other players are in use and where they show.
+- Quests taken from or turned in at several NPCs (innkeepers and so on) now show all of them.
+- Quests given by objects such as boards and books now get a "!" on the map.
+- Givers missing from the map data now get a "!" at the recorded spot.
+- Quest item objectives show both the dropping monsters and the looted spots.
+- The shared records option tooltip now describes the real rules.
+- Fixed "Uncheck all" never showing after "Check all" when the log holds more quests than the game can track.
