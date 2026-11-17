@@ -6,6 +6,23 @@
 -- (from Map Finder's quest locations). Quests still in progress
 -- can be shown too (grey "?", option). Clicking a mark sets a map waypoint.
 local _, ns = ...
+-- every EzWoW mark on the maps can be turned off at once, and the marks only
+-- the shared records make apart (Libs/EzWoWShare MapMarksOn / SharedMarksOn)
+local function ezMapOn(sharedOnly)
+    local share = _G.EzWoW_Share
+    local fn = type(share) == "table" and share[sharedOnly and "SharedMarksOn" or "MapMarksOn"]
+    if type(fn) ~= "function" then return true end
+    local ok, on = pcall(fn)
+    return not ok or on ~= false
+end
+-- every EzWoW line on the game's tooltips can be turned off at once (Game Menu >
+-- Options > AddOns > EzWoW - Data Sharing; Libs/EzWoWShare TooltipLinesOn)
+local function ezTipsOn()
+    local share = _G.EzWoW_Share
+    if type(share) ~= "table" or type(share.TooltipLinesOn) ~= "function" then return true end
+    local ok, on = pcall(share.TooltipLinesOn)
+    return not ok or on ~= false
+end
 -- frames made on the World Map are made without a parent and put in after
 -- (Libs/EzWoWGamePad MakeFrame: keeps the game's gamepad cursor untainted)
 local CreateFrame = (ns.GamePad and ns.GamePad.MakeFrame) or CreateFrame
@@ -881,6 +898,7 @@ end
 
 function QuestLogPins.refresh()
     QuestLogPins.hideAll()
+    if not ezMapOn() then return end
     if not (WorldMapFrame and WorldMapFrame:IsShown()) then return end
     local project = ns.MapProjector()
     if not project then return end
@@ -2163,7 +2181,7 @@ end
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType
     and Enum.TooltipDataType.Unit then
     pcall(TooltipDataProcessor.AddTooltipPostCall, Enum.TooltipDataType.Unit, function(tooltip, data)
-        if tooltip ~= GameTooltip or not npcTooltipOn() or type(data) ~= "table" then return end
+        if tooltip ~= GameTooltip or not npcTooltipOn() or not ezTipsOn() or type(data) ~= "table" then return end
         pcall(function()
             local id = npcIdOf(data.guid)
             if not id then return end
@@ -2216,7 +2234,7 @@ end
 
 if GameTooltip and GameTooltip.HookScript then
     GameTooltip:HookScript("OnShow", function(tooltip)
-        if addingToMinimap or not npcTooltipOn() or not Minimap then return end
+        if addingToMinimap or not npcTooltipOn() or not ezTipsOn() or not Minimap then return end
         local ok, owner = pcall(tooltip.GetOwner, tooltip)
         if not ok or owner ~= Minimap then return end
         buildNpcQuests()

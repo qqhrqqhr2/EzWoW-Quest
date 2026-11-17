@@ -9,6 +9,15 @@
 -- dots are joined by thin lines. Quests without such spots get a hollow gold
 -- ring at the game's own quest position. The minimap shows the marks nearby.
 local _, ns = ...
+-- every EzWoW mark on the maps can be turned off at once, and the marks only
+-- the shared records make apart (Libs/EzWoWShare MapMarksOn / SharedMarksOn)
+local function ezMapOn(sharedOnly)
+    local share = _G.EzWoW_Share
+    local fn = type(share) == "table" and share[sharedOnly and "SharedMarksOn" or "MapMarksOn"]
+    if type(fn) ~= "function" then return true end
+    local ok, on = pcall(fn)
+    return not ok or on ~= false
+end
 -- frames made on the World Map are made without a parent and put in after
 -- (Libs/EzWoWGamePad MakeFrame: keeps the game's gamepad cursor untainted)
 local CreateFrame = (ns.GamePad and ns.GamePad.MakeFrame) or CreateFrame
@@ -1400,7 +1409,7 @@ end
 
 function QuestObjectivePins.refreshWorld()
     QuestObjectivePins.hideWorld()
-    if not enabled() or #quests == 0 then return end
+    if not enabled() or #quests == 0 or not ezMapOn() then return end
     if not (WorldMapFrame and WorldMapFrame:IsShown()) then return end
     local project = ns.MapProjector()
     local mapID = WorldMapFrame.GetMapID and WorldMapFrame:GetMapID()
@@ -1592,7 +1601,7 @@ local function playerMapPosition(mapID)
 end
 
 function QuestObjectivePins.updateMinimap()
-    if not (Minimap and miniMapID and #miniPoints > 0 and enabled()) then hideMinimap() return end
+    if not (Minimap and miniMapID and #miniPoints > 0 and enabled() and ezMapOn()) then hideMinimap() return end
     local px, py = playerMapPosition(miniMapID)
     local radius = minimapRadiusYards()
     local okSize, mapW, mapH = false, nil, nil
@@ -2205,3 +2214,16 @@ function QuestObjectivePins.guideTo(questID)
 end
 
 ns.RefreshQuestObjectivePins = QuestObjectivePins.refreshAll
+
+-- the EzWoW map marks turned on or off (Libs/EzWoWShare settings window)
+do
+    local share = _G.EzWoW_Share
+    if type(share) == "table" and type(share.RegisterCallback) == "function" then
+        share.RegisterCallback("EzWoW-Quest-Marks", function(kinds)
+            if type(kinds) ~= "table" or not kinds.mapMarks then return end
+            if ns.RefreshQuestLogPins then pcall(ns.RefreshQuestLogPins) end
+            pcall(QuestObjectivePins.refreshWorld)
+            pcall(QuestObjectivePins.updateMinimap)
+        end)
+    end
+end
