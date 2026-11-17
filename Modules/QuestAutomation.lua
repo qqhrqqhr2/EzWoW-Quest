@@ -32,7 +32,21 @@ local function paused()
     return IsShiftKeyDown and IsShiftKeyDown() and true or false
 end
 
-local function acceptOn() return db().questAutoAccept == true and not paused() end
+-- Quest log full: the game turns an accept down with an error. After that no
+-- quest is picked or accepted by itself until a quest leaves the log (else the
+-- NPC's list and the quest window go round and round, the error each time).
+local logFull = false
+
+local function isLogFullError(message)
+    message = plain(message)
+    if type(message) ~= "string" or message == "" then return false end
+    local full = plain(_G.ERR_QUEST_LOG_FULL)
+    if type(full) == "string" and full ~= "" and message == full then return true end
+    local lower = message:lower()
+    return lower:find("quest log is full", 1, true) ~= nil or message:find("퀘스트 목록이 가득", 1, true) ~= nil
+end
+
+local function acceptOn() return db().questAutoAccept == true and not paused() and not logFull end
 local function completeOn() return db().questAutoComplete == true and not paused() end
 local function skipRisky() return db().questSkipRisky ~= false end
 local function skipItems() return db().questSkipItems == true end
@@ -369,9 +383,21 @@ for event in pairs(HANDLERS) do pcall(eventFrame.RegisterEvent, eventFrame, even
 pcall(eventFrame.RegisterEvent, eventFrame, "QUEST_FINISHED")
 pcall(eventFrame.RegisterEvent, eventFrame, "GOSSIP_CLOSED")
 pcall(eventFrame.RegisterEvent, eventFrame, "GET_ITEM_INFO_RECEIVED")
+-- quest log full (the game's error), and a quest leaving or joining the log
+for _, event in ipairs({ "UI_ERROR_MESSAGE", "QUEST_REMOVED", "QUEST_TURNED_IN", "QUEST_ACCEPTED" }) do
+    pcall(eventFrame.RegisterEvent, eventFrame, event)
+end
 if not displayHooked then pcall(eventFrame.RegisterEvent, eventFrame, "ADDON_LOADED") end
-eventFrame:SetScript("OnEvent", function(_, event)
-    if event == "QUEST_FINISHED" then
+eventFrame:SetScript("OnEvent", function(_, event, ...)
+    if event == "UI_ERROR_MESSAGE" then
+        -- (the error type and its text; older clients send the text only)
+        local first, second = ...
+        if isLogFullError(second) or isLogFullError(first) then logFull = true end
+        return
+    elseif event == "QUEST_REMOVED" or event == "QUEST_TURNED_IN" or event == "QUEST_ACCEPTED" then
+        logFull = false
+        return
+    elseif event == "QUEST_FINISHED" then
         rewardWaiting = false
         hideBestMark()
         return
