@@ -110,6 +110,20 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 - 길 안내는 아직 채우지 않은 목표의 위치 중 가장 가까운 곳을, 목표를 다 채운 퀘스트는 보고 위치를 가리킵니다. 안내할 곳이 없으면 퀘스트 로그만 엽니다.
 - 전투 중에는 보호된 창 속성을 바꾸지 않습니다. 퀘스트 아이템 버튼은 전투가 끝난 뒤 갱신됩니다.
 
+### 경험치 창
+
+레벨업까지 얼마나 남았는지 한 창에서 실시간으로 보여 줍니다. **Ctrl + 끌기**로 옮기고, **Ctrl + 마우스 휠**로 크기(60~160%)를 바꿉니다. 최고 레벨이면 숨겨집니다.
+
+- **경험치 막대**: 지금 경험치(파랑) 뒤로 완료한 퀘스트를 보고하면 얻는 경험치(민트)가 이어지고, 위쪽 얇은 띠로 진행 중인 퀘스트의 경험치(금색), 아래쪽 얇은 띠로 휴식 경험치(파랑)를 보여 줍니다. 보고만 해도 레벨업이면 막대가 빛납니다.
+- **글자**: 레벨·진행률, `보고 +23%`, `휴식 8%`, 시간당 경험치·레벨업까지 남은 시간, 레벨업까지 남은 몹 수.
+- 경험치를 얻으면 막대가 부드럽게 차오르고 얻은 양(`+1,250`)이 떠오릅니다.
+- **시간당 경험치**는 최근 15분 동안 실제로 플레이한 시간 기준입니다(자리 비움은 빼고 셈). `/reload`나 15분 안의 재접속은 이어서 잽니다. **Shift + 오른쪽 클릭**으로 새로 잽니다.
+- **레벨업까지 몹 수**는 최근 15마리의 평균(휴식 보너스를 뺀 값)으로 계산하고, 휴식 경험치가 남아 있으면 그만큼 적게 셉니다. 아직 잡은 몹이 없으면 내 레벨 몹의 일반적인 경험치로 추정합니다.
+- **마우스를 올리면**: 경험치·남은 양·휴식, 완료한 퀘스트별 경험치와 합계, 진행 중인 퀘스트 합계, 시간당 경험치(최근 15분 / 이번 접속), 레벨업까지 시간과 몹 수(보고 후 값도), 이번 레벨에 걸린 시간과 퀘스트·사냥 경험치, 이번 접속.
+- **퀘스트별 경험치**: 추적기의 퀘스트 줄 끝과 지도의 퀘스트 표시 툴팁에 그 퀘스트의 경험치(`+1,250`)가 나옵니다. 추적기 퀘스트 툴팁의 보상 경험치에는 지금 레벨의 몇 %인지도 붙습니다.
+- **알림**: 완료한 퀘스트만 보고해도 레벨업이면 채팅에 한 번 알리고 소리를 냅니다. 레벨업하면 그 레벨에 걸린 시간, 퀘스트·사냥 경험치, 시간당 경험치를 채팅에 요약합니다(나에게만 보임).
+- 전투·인스턴스 중에는 애드온이 채팅을 읽을 수 없어, 사냥 경험치는 전투 중(끝난 뒤 3초 포함)에 오른 경험치에서 퀘스트 보고분을 빼고 셉니다.
+
 ### 퀘스트 자동화
 
 설정창의 **퀘스트 자동화** 항목에서 켭니다. NPC와 대화할 때 **Shift**를 누르고 있으면 그 대화에서는 자동화가 동작하지 않습니다.
@@ -140,7 +154,11 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 | ④ | 진행 중인 퀘스트 위치도 표시 | 끔 |
 | ④ | 진행 중인 퀘스트 목표 위치 표시 (지도·미니맵) | 켬 |
 | ④ | 받을 수 있는 퀘스트 주는 NPC 표시 (!) | 켬 |
-| ⑤ | 설정 기본값 복원(언어와 모아 둔 퀘스트 정보는 유지) · 추적기 위치·크기 초기화 | - |
+| ⑥ | 경험치 창 표시 (Ctrl + 끌기로 이동) | 켬 |
+| ⑥ | 추적창과 지도 표시에 퀘스트별 경험치 표시 | 켬 |
+| ⑥ | 완료한 퀘스트만 보고해도 레벨업이면 알림 | 켬 |
+| ⑥ | 레벨업하면 채팅에 그 레벨 요약 | 켬 |
+| ⑤ | 설정 기본값 복원(언어, 모아 둔 퀘스트 정보, 경험치 기록은 유지) · 추적기 위치·크기 초기화 | - |
 
 - ④ 항목은 **EzWoW - Map Finder**가 없으면 흐려지고 안내 문구가 나옵니다.
 
@@ -151,6 +169,8 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 | `/ezq` | 설정창 열기/닫기 |
 | `/ezq reset` (`/퀘스트 초기화`) | 추적기 위치·크기 초기화 |
 | `/ezq help` (`/퀘스트 도움말`) | 명령어 안내 |
+| `/ezq xp` (`/퀘스트 경험치`) | 경험치 요약을 채팅에 출력 |
+| `/ezq xp reset` (`/퀘스트 경험치 초기화`) | 시간당 경험치를 새로 재기 |
 
 ### 다른 EzWoW 애드온과 함께 쓰기
 
@@ -160,7 +180,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 
 ### 저장 데이터
 
-- `EzWoW_QuestDB`: 설정, 추적기 위치·크기·접힘·숨긴 퀘스트, 게임 중에 알아낸 퀘스트 정보(퀘스트 NPC, 아이템을 떨어뜨리는 몬스터, 정찰 지점 등)와 다른 사용자에게 받은 정보.
+- `EzWoW_QuestDB`: 설정, 추적기 위치·크기·접힘·숨긴 퀘스트, 게임 중에 알아낸 퀘스트 정보(퀘스트 NPC, 아이템을 떨어뜨리는 몬스터, 정찰 지점 등)와 다른 사용자에게 받은 정보, 경험치 창 위치·크기와 캐릭터별 경험치 기록(이번 접속, 이번 레벨, 최근 몹 경험치; 120일 넘게 접속하지 않은 캐릭터는 지움).
 
 <!-- ezwow-pad-share -->
 ### 게임패드
@@ -274,6 +294,20 @@ Hover a dot, question mark or exclamation mark on the map to see the quest and o
 - The guide points at the nearest place of an unfinished objective, or at the turn-in spot once the objectives are done. With nowhere to guide to, only the quest log opens.
 - Protected frame attributes are never changed in combat. Quest item buttons are updated after combat.
 
+### Experience window
+
+One window shows, live, how far the next level is. Move it with **Ctrl + drag** and resize it (60–160%) with **Ctrl + mouse wheel**. It hides at the highest level.
+
+- **XP bar**: after your current XP (blue) comes the XP of completed quests waiting to be turned in (mint); a thin band along the top shows the XP of quests in progress (gold) and one along the bottom shows rested XP (blue). When turning in alone levels you up, the bar glows.
+- **Text**: level and progress, `turn-in +23%`, `rested 8%`, XP per hour with the time to level, and kills to level.
+- When XP comes in, the bar fills smoothly and the amount (`+1,250`) rises from it.
+- **XP per hour** counts the last 15 minutes of actual play (away time is left out). It carries over a `/reload` or a relog within 15 minutes. **Shift + right-click** starts it over.
+- **Kills to level** uses the average of your last 15 kills (without the rested bonus) and counts fewer while rested XP lasts. Before your first kill it estimates from the usual XP of a monster of your level.
+- **Hover** for XP, what is left and rested; each completed quest's XP and the total; the quests in progress; XP per hour (last 15 minutes / session); time and kills to level (also after turn-ins); time spent on this level with its quest and kill XP; and this session.
+- **Each quest's XP**: the tracker's quest lines and the map quest mark tooltips end with the quest's XP (`+1,250`). The reward XP in the tracker's quest tooltip also shows its share of the current level.
+- **Notes**: when turning in your completed quests is enough to level up, you get one chat line and a sound. On level-up, a chat summary (only you see it) lists the time the level took, quest and kill XP, and XP per hour.
+- Addons can't read chat in combat or instances, so kill XP is the XP gained in combat (and up to 3 seconds after), minus quest turn-ins.
+
 ### Quest automation
 
 Turn it on in the **Quest automation** section of the settings. Hold **Shift** while talking to an NPC to skip automation for that conversation.
@@ -304,7 +338,11 @@ Turn it on in the **Quest automation** section of the settings. Hold **Shift** w
 | ④ | Also show spots of quests still in progress | Off |
 | ④ | Show objective spots of quests in progress (map and minimap) | On |
 | ④ | Show quest givers with quests you can take ("!") | On |
-| ⑤ | Restore Defaults (keeps the language and the learned quest data) · Reset tracker position & size | - |
+| ⑥ | Show the experience window (Ctrl + drag to move) | On |
+| ⑥ | Show each quest's XP in the tracker and on map marks | On |
+| ⑥ | Tell me when turning in completed quests levels me up | On |
+| ⑥ | Level-up summary in chat | On |
+| ⑤ | Restore Defaults (keeps the language, the learned quest data and the XP records) · Reset tracker position & size | - |
 
 - The ④ options are dimmed, with a note, when **EzWoW - Map Finder** is not enabled.
 
@@ -315,6 +353,8 @@ Turn it on in the **Quest automation** section of the settings. Hold **Shift** w
 | `/ezq` | Open/close settings |
 | `/ezq reset` | Reset the tracker position and size |
 | `/ezq help` | List the commands |
+| `/ezq xp` | Print the XP summary in chat |
+| `/ezq xp reset` | Start XP per hour over |
 
 ### Working with other EzWoW addons
 
@@ -324,7 +364,7 @@ Turn it on in the **Quest automation** section of the settings. Hold **Shift** w
 
 ### Saved data
 
-- `EzWoW_QuestDB`: settings, tracker position, size, folded and hidden quests, quest data learned while playing (quest NPCs, which creatures drop quest items, scouting spots) and data received from other players.
+- `EzWoW_QuestDB`: settings, tracker position, size, folded and hidden quests, quest data learned while playing (quest NPCs, which creatures drop quest items, scouting spots), data received from other players, and the experience window's place and size with per-character XP records (session, this level, recent kill XP; characters not seen for 120 days are dropped).
 
 ### Gamepad
 - With the gamepad UI on, EzWoW windows work with a gamepad: D-pad to move, A (✕) to press, X (□) for right-click, LB/RB to scroll, B (○) to close. A key guide in your pad's button style shows under the window.

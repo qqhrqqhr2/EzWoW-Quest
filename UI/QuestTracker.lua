@@ -1256,6 +1256,8 @@ function ObjectiveTrackerController.addRewardTooltipLines(questData)
     GameTooltip:AddLine(ns:L("TRACKER_TT_REWARDS"), STYLE.accent[1], STYLE.accent[2], STYLE.accent[3])
     if rewards.xp > 0 then
         local xpText = type(BreakUpLargeNumbers) == "function" and BreakUpLargeNumbers(rewards.xp) or tostring(rewards.xp)
+        -- its share of the current level
+        if ns.XP and ns.XP.pctOf then xpText = xpText .. " (" .. ns.XP.pctOf(rewards.xp) .. ")" end
         GameTooltip:AddLine(ns:L("TRACKER_TT_REWARD_XP") .. " " .. xpText, 1, 1, 1)
     end
     if rewards.money > 0 then
@@ -2121,7 +2123,8 @@ function ns:UpdateQuestTracker()
 
                     local partySuffix = ObjectiveTrackerController.resolvePartySuffix(priorityQueue)
                     local newMark = ObjectiveTrackerController.isQuestNew(priorityQueue.questID) and "|cff4fd1ffNEW|r " or ""
-                    qLine.text:SetText(focusMark .. newMark .. diffHex .. lvPrefix .. (priorityQueue.title or "") .. "|r" .. stateSuffix .. partySuffix)
+                    local xpSuffix = ns.XP and ns.XP.questSuffix and ns.XP.questSuffix(priorityQueue.questID) or ""
+                    qLine.text:SetText(focusMark .. newMark .. diffHex .. lvPrefix .. (priorityQueue.title or "") .. "|r" .. stateSuffix .. xpSuffix .. partySuffix)
 
                     local qhVal = math.max(15, (qLine.text:GetStringHeight() or 13) + 2)
                     qLine:SetSize(math.max(90, innerWidth - 8 - itemIndent), qhVal)

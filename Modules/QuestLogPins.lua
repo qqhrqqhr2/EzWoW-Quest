@@ -674,6 +674,19 @@ function QuestLogPins.turnInSpotsForQuest(questID)
     return QuestLogPins.spotsFor(entry, questID)
 end
 
+-- name of the NPC (or object) at a turn-in spot: the data's NPC there, else the
+-- name the learned records give (spotNames: second value of turnInSpotsForQuest)
+function QuestLogPins.turnInNameAt(sp, spotNames)
+    QuestLogPins.buildIndexes()
+    local key = spotKey(sp)
+    if not key then return nil end
+    local npc = npcBySpot and npcBySpot[key]
+    local name = npc and ns.GetLocalizedEntityName and ns.GetLocalizedEntityName(npc)
+    if type(name) == "string" and name ~= "" then return name end
+    name = spotNames and spotNames[key]
+    return type(name) == "string" and name ~= "" and name or nil
+end
+
 function QuestLogPins.questEntry(questID)
     QuestLogPins.buildIndexes()
     return questIndex and questIndex[questID] or nil
@@ -805,6 +818,7 @@ function QuestLogPins.obtainPin(index)
     if pin then return pin end
     local canvasFrame = QuestLogPins.canvas()
     pin = CreateFrame("Button", nil, canvasFrame)
+    if ns.GamePad and ns.GamePad.MapMark then ns.GamePad.MapMark(pin) end
     pin:EnableMouse(true)
     pin:RegisterForClicks("LeftButtonUp")
     setPropagateClicks(pin, false)
@@ -833,7 +847,8 @@ function QuestLogPins.obtainPin(index)
         GameTooltip:SetText(group.npcName or "EzWoW - Quest", unpack(Theme.accent))
         for _, quest in ipairs(group.quests) do
             local state = quest.complete and ("|cff40ff59" .. ns:L("questPinReady") .. "|r") or ("|cffa7b9c5" .. ns:L("questPinActive") .. "|r")
-            GameTooltip:AddLine(ns.QuestLevelPrefix(quest.id) .. (quest.title or ("#" .. quest.id)) .. "  " .. state, 0.929, 0.957, 0.969, true)
+            local xpSuffix = ns.XP and ns.XP.questSuffix and ns.XP.questSuffix(quest.id) or ""
+            GameTooltip:AddLine(ns.QuestLevelPrefix(quest.id) .. (quest.title or ("#" .. quest.id)) .. "  " .. state .. xpSuffix, 0.929, 0.957, 0.969, true)
         end
         GameTooltip:AddLine(ns:L("questPinHint"), unpack(Theme.muted))
         GameTooltip:AddDoubleLine(" ", "EzWoW - Quest", 0, 0, 0, 0.5, 0.5, 0.5)
@@ -1998,6 +2013,7 @@ local function obtainGiverPin(index)
     local pin = giverPins[index]
     if pin then return pin end
     pin = CreateFrame("Button", nil, QuestLogPins.canvas())
+    if ns.GamePad and ns.GamePad.MapMark then ns.GamePad.MapMark(pin) end
     pin:EnableMouse(true)
     pin:RegisterForClicks("LeftButtonUp")
     setPropagateClicks(pin, false)

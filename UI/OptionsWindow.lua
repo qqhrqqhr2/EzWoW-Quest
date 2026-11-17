@@ -259,7 +259,7 @@ function ns:CreateSettingsWindow()
     if settingsFrame then return settingsFrame end
 
     local windowFrame = CreateFrame("Frame", SETTINGS_NAME, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    windowFrame:SetSize(480, 583)
+    windowFrame:SetSize(480, 655)
     windowFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     windowFrame:SetFrameStrata("FULLSCREEN_DIALOG")
     windowFrame:SetToplevel(true)
@@ -422,6 +422,20 @@ function ns:CreateSettingsWindow()
     end)
     windowFrame.chkQuestShareData.tipKey = "TIP_QUEST_SHARE_DATA"
 
+    -- Experience window (UI/ExperienceBar.lua)
+    windowFrame.secXp = SettingsDialog.buildSectionHeader(windowFrame, -539)
+    local function xpCheck(x, y, key)
+        return SettingsDialog.buildFlatCheckbox(windowFrame, x, y, function(checked)
+            ns:InitializeDatabase()[key] = checked
+            if ns.XP and ns.XP.update then pcall(ns.XP.update) end
+            if ns.UpdateQuestTracker then ns:UpdateQuestTracker() end
+        end, 215)
+    end
+    windowFrame.chkXpWindow = xpCheck(20, -563, "xpWindow")
+    windowFrame.chkXpQuestTags = xpCheck(245, -563, "xpQuestTags")
+    windowFrame.chkXpDingAlert = xpCheck(20, -586, "xpDingAlert")
+    windowFrame.chkXpLevelSummary = xpCheck(245, -586, "xpLevelSummary")
+
     local mapNote = windowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     mapNote:SetPoint("TOPLEFT", windowFrame, "TOPLEFT", 22, -515)
     mapNote:SetPoint("TOPRIGHT", windowFrame, "TOPRIGHT", -20, -515)
@@ -514,6 +528,16 @@ function ns:RefreshSettingsUI()
         SettingsDialog.setFittedLabel(w.chkTrackerParty, self:L("OPT_TRACKER_PARTY"))
         w.chkTrackerParty:SetChecked(savedDB.trackerPartyStatus ~= false)
 
+        w.secXp.title:SetText(self:L("SECTION_XP"))
+        SettingsDialog.setFittedLabel(w.chkXpWindow, self:L("OPT_XP_WINDOW"))
+        w.chkXpWindow:SetChecked(savedDB.xpWindow ~= false)
+        SettingsDialog.setFittedLabel(w.chkXpQuestTags, self:L("OPT_XP_QUEST_TAGS"))
+        w.chkXpQuestTags:SetChecked(savedDB.xpQuestTags ~= false)
+        SettingsDialog.setFittedLabel(w.chkXpDingAlert, self:L("OPT_XP_DING_ALERT"))
+        w.chkXpDingAlert:SetChecked(savedDB.xpDingAlert ~= false)
+        SettingsDialog.setFittedLabel(w.chkXpLevelSummary, self:L("OPT_XP_LEVEL_SUMMARY"))
+        w.chkXpLevelSummary:SetChecked(savedDB.xpLevelSummary ~= false)
+
         w.secMap.title:SetText(self:L("SECTION_MAP"))
         SettingsDialog.setFittedLabel(w.chkQuestLogPins, self:L("questLogPins"))
         w.chkQuestLogPins:SetChecked(savedDB.questLogPins ~= false)
@@ -543,7 +567,7 @@ function ns:RefreshSettingsUI()
 end
 
 -- Every setting back to its default; learned quest data is kept.
-local KEEP_ON_RESET = { questDropSources = true, questStarters = true, questEnders = true, questEventSpots = true, questDropItems = true, questEventShared = true, questGivers = true, lang = true }
+local KEEP_ON_RESET = { questDropSources = true, questStarters = true, questEnders = true, questEventSpots = true, questDropItems = true, questEventShared = true, questGivers = true, lang = true, xpChars = true }
 
 function ns:ResetToDefaults()
     local savedDB = self:InitializeDatabase()
@@ -558,6 +582,12 @@ function ns:ResetToDefaults()
     end
     if self.ResetQuestTrackerPosition then
         self:ResetQuestTrackerPosition(true)
+    end
+    -- the experience window back to its default place and size
+    savedDB.xpPos, savedDB.xpScale = nil, nil
+    if self.XP then
+        if self.XP.applyPosition then pcall(self.XP.applyPosition) end
+        if self.XP.update then pcall(self.XP.update) end
     end
     refreshMapMarks()
     self:PrintMsg(self:L("MSG_DEFAULTS_RESET"))
@@ -641,6 +671,10 @@ SlashCmdList["EZWOWQUEST"] = function(msg)
     local cmd = string.lower(string.gsub(msg or "", "^%s*(.-)%s*$", "%1"))
     if cmd == "reset" or cmd == "초기화" then
         if ns.ResetQuestTrackerPosition then ns:ResetQuestTrackerPosition(false) end
+    elseif cmd == "xp" or cmd == "경험치" then
+        if ns.XP and ns.XP.report then ns.XP.report() end
+    elseif cmd == "xp reset" or cmd == "경험치 초기화" then
+        if ns.XP and ns.XP.resetSession then ns.XP.resetSession() end
     elseif cmd == "help" or cmd == "?" or cmd == "도움말" then
         ns:PrintMsg(ns:L("MSG_HELP"))
     else

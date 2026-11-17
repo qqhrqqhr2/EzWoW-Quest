@@ -62,6 +62,13 @@ ns.DEFAULTS = {
     questDropItems = {},
     questEventShared = {},
     questGivers = {},
+    -- experience window (UI/ExperienceBar.lua); xpChars: per character
+    -- (session XP per hour, this level, last kills), xpPos / xpScale: its place
+    xpWindow = true,
+    xpQuestTags = true,
+    xpDingAlert = true,
+    xpLevelSummary = true,
+    xpChars = {},
     -- sharing learned spots with other players of this addon
     questShareData = true,
     questShareChannel = true,

@@ -941,6 +941,18 @@ local function objectiveLine(obj)
     return text
 end
 
+-- what an objective is about, without its count (for arrow labels, which
+-- would otherwise keep an old count)
+local function objectiveName(obj)
+    local text = type(obj) == "table" and obj.text
+    if type(text) ~= "string" or text == "" or isSecret(text) then return nil end
+    -- the count at the end, then a colon before it (also the full-width one;
+    -- a byte class would cut that one in half)
+    text = text:gsub("%s*%d+%s*/%s*%d+%s*$", "")
+    text = text:gsub("%s*:%s*$", ""):gsub("%s*：%s*$", "")
+    return text ~= "" and text or nil
+end
+
 local function hexColor(c)
     return string.format("|cff%02x%02x%02x", floor(c[1] * 255 + 0.5), floor(c[2] * 255 + 0.5), floor(c[3] * 255 + 0.5))
 end
@@ -1011,6 +1023,14 @@ local function onPinClick(self)
     local item = group.items and group.items[1]
     local quest = item and item.quest
     local labelText = (quest and quest.title) or ""
+    -- the objective this dot is for (its monster, item or object)
+    for _, obj in ipairs(item and item.objectives or {}) do
+        local name = not obj.finished and objectiveName(obj)
+        if name then
+            labelText = labelText ~= "" and (labelText .. " - " .. name) or name
+            break
+        end
+    end
     local mark = ns.MarkClick
     local key = group.spawn
         or (group.mapPoint and (group.mapPoint[1] .. ":" .. group.mapPoint[2] .. ":" .. group.mapPoint[3]))
@@ -1111,6 +1131,7 @@ local function obtainDot(index)
     local pin = dotPins[index]
     if pin then return pin end
     pin = CreateFrame("Button", nil, canvas())
+    if ns.GamePad and ns.GamePad.MapMark then ns.GamePad.MapMark(pin) end
     pin:EnableMouse(true)
     pin:RegisterForClicks("LeftButtonUp")
     setPropagateClicks(pin, false)
@@ -1141,6 +1162,7 @@ local function obtainArea(index)
     local pin = areaPins[index]
     if pin then return pin end
     pin = CreateFrame("Button", nil, canvas())
+    if ns.GamePad and ns.GamePad.MapMark then ns.GamePad.MapMark(pin) end
     pin:EnableMouse(true)
     pin:RegisterForClicks("LeftButtonUp")
     setPropagateClicks(pin, false)
@@ -1772,7 +1794,13 @@ local function installMapHooks()
         QuestObjectivePins.refreshWorld()
         if ns.RefreshQuestLogPins then ns.RefreshQuestLogPins() end
     end
+    -- the map calls this on every frame in some states (the gamepad cursor on the
+    -- map): the marks are placed again only when the scale really changed
+    local lastScale
     local function onScale()
+        local s = WorldMapFrame.GetCanvasScale and WorldMapFrame:GetCanvasScale()
+        if s and s == lastScale then return end
+        lastScale = s
         QuestObjectivePins.rescaleWorld()
         if ns.RescaleQuestLogPins then ns.RescaleQuestLogPins() end
     end
@@ -2035,10 +2063,12 @@ function QuestObjectivePins.guideTo(questID)
     local spots = {}   -- { spawn, entry, index }
     local onlyMentions = false
     if qlp and qlp.isQuestComplete and qlp.isQuestComplete(questID) then
-        local turnIn = qlp.turnInSpotsForQuest and qlp.turnInSpotsForQuest(questID)
+        local turnIn, turnInNames = nil, nil
+        if qlp.turnInSpotsForQuest then turnIn, turnInNames = qlp.turnInSpotsForQuest(questID) end
         if turnIn and #turnIn > 0 then
             local qe = qlp.questEntry and qlp.questEntry(questID)
-            local shown = { id = questID, kind = "quest", names = qe and qe.names, spawns = turnIn }
+            local shown = { id = questID, kind = "quest", names = qe and qe.names, spawns = turnIn,
+                turnIn = true, spotNames = turnInNames }
             for i, sp in ipairs(turnIn) do spots[#spots + 1] = { sp, shown, i } end
         end
     else
@@ -2099,8 +2129,28 @@ function QuestObjectivePins.guideTo(questID)
     -- the chat line says where the guide points, also when that is another map
     local mapID, mx, my = nil, nil, nil
     if project then mapID, mx, my = project(best[1], nil) end
-    local targetName = (api and type(api.LocalizedName) == "function" and api.LocalizedName(best[2]))
-        or (best[2].names and best[2].names.enUS) or "?"
+    -- what is at the spot: the turn-in NPC, the objective's monster / item /
+    -- object; for the game's own point of the quest, the objective to do there
+    local targetName
+    if best[2].turnIn and qlp and qlp.turnInNameAt then
+        targetName = qlp.turnInNameAt(best[1], best[2].spotNames)
+    elseif best[2].kind ~= "quest" then
+        targetName = api and type(api.LocalizedName) == "function" and api.LocalizedName(best[2])
+            or (best[2].names and best[2].names.enUS)
+    end
+    if not targetName or targetName == "" or targetName == title then
+        local quest = questByID[questID]
+        for _, obj in ipairs(quest and quest.objectives or {}) do
+            local name = not obj.finished and objectiveName(obj)
+            if name then
+                targetName = name
+                break
+            end
+        end
+    end
+    if not targetName or targetName == "" or targetName == title then
+        targetName = (qlp and qlp.isQuestComplete and qlp.isQuestComplete(questID)) and ns:L("questPinReady") or "?"
+    end
     local mapInfo = mapID and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(mapID)
     if mx and my then
         guideSay(string.format(guideText("questGuideTo") or "%s > %s - %s (%.1f, %.1f)", title, targetName,

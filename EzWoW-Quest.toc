@@ -45,4 +45,5 @@ Modules\DataShare.lua
 Modules\QuestLogPins.lua
 Modules\QuestObjectivePins.lua
 UI\QuestTracker.lua
+UI\ExperienceBar.lua
 UI\OptionsWindow.lua
