@@ -58,7 +58,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 | ⑪ | 파티 진행 알림 | 파티(인스턴스 그룹)에 수락·목표 진행·목표 달성·완료를 알림. 공격대에서는 보내지 않음 |
 | ⑫ | 받을 수 있는 퀘스트 (`!`) | 지금 받을 수 있는 퀘스트가 있는 NPC를 세계지도에 금색 테두리의 작은 어두운 원 안에 노란 `!`로 표시. 마우스를 올리면 NPC 이름과 퀘스트 목록(`! [레벨] 퀘스트 이름`) |
 
-지도의 점·물음표·느낌표에 마우스를 올리면 퀘스트와 목표가 나옵니다. 클릭하면 그 자리에 웨이포인트와 화살표를 찍습니다. 한 번 더 누르면 웨이포인트를 지웁니다.
+지도의 점·물음표·느낌표에 마우스를 올리면 퀘스트와 목표가 나옵니다. 클릭하면 그 자리에 웨이포인트와 화살표를 찍습니다. 한 번 더 누르면 웨이포인트를 지웁니다. 화살표 창은 게임 설정 > 애드온 > **EzWoW - Data Sharing**(`/ezshare`)에서 "화면의 추적 화살표 창"을 끄면 숨길 수 있습니다(지도의 핀은 그대로, 모든 EzWoW 애드온에 같이 적용).
 
 #### 받을 수 있는 퀘스트 (`!`)
 
@@ -242,7 +242,7 @@ All quest features in one addon.
 | ⑪ | Party progress messages | Tells your party (or instance group) about accepted quests, progress, finished objectives and turn-ins. Never sent in a raid |
 | ⑫ | Quests you can take (`!`) | NPCs with a quest you can take now get a yellow `!` in a small dark badge with a gold rim on the World Map. Hover for the NPC and its quests (`! [Lv] quest name`) |
 
-Hover a dot, question mark or exclamation mark on the map to see the quest and objective. Clicking one sets a waypoint and the arrow there. Click again to remove the waypoint.
+Hover a dot, question mark or exclamation mark on the map to see the quest and objective. Clicking one sets a waypoint and the arrow there. Click again to remove the waypoint. To hide the arrow window, uncheck "Arrow window on screen" in Options > AddOns > **EzWoW - Data Sharing** (`/ezshare`); the pin on the map stays, for all EzWoW addons.
 
 #### Quests you can take (`!`)
 

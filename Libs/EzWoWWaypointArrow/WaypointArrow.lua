@@ -7,7 +7,9 @@
 -- While the game holds a map waypoint (set by an EzWoW addon or by hand on the
 -- map), a small window shows what is tracked, an arrow turned toward it and
 -- the distance in yards. The X clears the waypoint. Nothing is shown inside
--- instances (the game gives no position there).
+-- instances (the game gives no position there). The player can turn the window
+-- off for every EzWoW addon (EzWoW - Data Sharing settings or Map Finder's
+-- options, /ezshare arrow off); the game's pin stays then.
 --
 -- Addons name the waypoint they set right after setting it:
 --   EzWoW_WaypointArrow.SetLabel("Hogger", "EzWoW - Map Finder")
@@ -15,7 +17,7 @@ local ADDON_NAME, ns = ...
 local type, pcall, tostring, tonumber, ipairs = type, pcall, tostring, tonumber, ipairs
 local atan2, sqrt, floor, abs = math.atan2 or math.atan, math.sqrt, math.floor, math.abs
 
-local LIB_VERSION = 4
+local LIB_VERSION = 5
 
 local lib = _G.EzWoW_WaypointArrow
 if type(lib) ~= "table" then
@@ -65,6 +67,18 @@ for locale, list in pairs(STYLE_TEXT) do
     t.styleHint, t.styleTitle = list[1], list[2]
     for i, key in ipairs(STYLES) do t["style_" .. key] = list[i + 2] end
 end
+-- where the window is turned off (the settings of every EzWoW addon)
+local OFF_HINT = {
+    enUS = "Hide this arrow: /ezshare",
+    koKR = "이 화살표 끄기: /ezshare",
+    deDE = "Pfeil ausblenden: /ezshare",
+    frFR = "Masquer cette flèche : /ezshare",
+    esES = "Ocultar esta flecha: /ezshare",
+    ruRU = "Скрыть стрелку: /ezshare",
+    zhCN = "隐藏此箭头：/ezshare",
+    zhTW = "隱藏此箭頭：/ezshare",
+}
+for locale, hint in pairs(OFF_HINT) do TEXT[locale].offHint = hint end
 TEXT.esMX = TEXT.esES
 TEXT.enGB = TEXT.enUS
 
@@ -273,7 +287,7 @@ function lib.ToggleMenu()
     m:Show()
 end
 
--- name and source of the waypoint an EzWoW addon set last; also kept in the
+-- name (and source, kept for older copies; not shown) of the waypoint an EzWoW addon set last; also kept in the
 -- shared saved data (t = when, so the newest saved copy wins) so it survives /reload and relog
 local label
 
@@ -346,15 +360,14 @@ function lib.Update()
     if not f then return end
     local tMap, tx, ty = currentWaypoint()
     if not tMap then lib.Refresh() return end
-    local title, source = labelFor(tMap, tx, ty)
+    local title = labelFor(tMap, tx, ty)
     if f.title:GetText() ~= title then
         f.title:SetText(title)
         -- the window grows with the name so dragging covers all of it
         local okH, h = pcall(f.title.GetStringHeight, f.title)
         h = okH and num(h) or 14
-        f:SetHeight(h + 90)
+        f:SetHeight(h + 78)
     end
-    f.tag:SetText(source or "EzWoW")
     local pMap, px, py = playerPosition()
     if not pMap then
         f.arrow:Hide()
@@ -397,7 +410,7 @@ function lib.Create()
     local f = CreateFrame("Frame", "EzWoW_WaypointArrowFrame", UIParent)
     lib.frame = f
     f:Hide()
-    f:SetSize(180, 104)
+    f:SetSize(180, 92)
     f:SetFrameStrata("MEDIUM")
     f:SetClampedToScreen(true)
     f:SetMovable(true)
@@ -444,12 +457,8 @@ function lib.Create()
     f.text:SetWidth(176)
     outline(f.text)
 
-    -- which addon set the waypoint
-    f.tag = f:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    f.tag:SetPoint("TOP", f.text, "BOTTOM", 0, -2)
-    outline(f.tag, 9)
-    f.tag:SetTextColor(0.6, 0.6, 0.6)
-    f.tag:SetText("EzWoW")
+    -- (no line naming the addon that set the waypoint: the window is turned
+    -- off in the shared settings, not in that addon, so a name there misleads)
 
     local stop = CreateFrame("Button", nil, f)
     stop:SetSize(16, 16)
@@ -481,7 +490,8 @@ function lib.Create()
     end)
     f:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:SetText(text("styleHint"), 1, 1, 1)
+        -- both lines as line 1: a card look of the tooltip draws its header rule under line 1
+        GameTooltip:SetText(text("styleHint") .. "\n|cffb3b3b3" .. text("offHint") .. "|r", 1, 1, 1)
         GameTooltip:Show()
     end)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -498,9 +508,15 @@ function lib.Create()
     return f
 end
 
+-- the player turned the window off (shared settings; the pin stays)
+local function turnedOff()
+    local settings = savedPosition()
+    return settings ~= nil and settings.noArrow == true
+end
+
 -- show the window while there is a waypoint to point at
 function lib.Refresh()
-    local want = not inInstance() and not otherArrowShown() and currentWaypoint() ~= nil
+    local want = not turnedOff() and not inInstance() and not otherArrowShown() and currentWaypoint() ~= nil
     if want then
         lib.Create()
         if not lib.frame:IsShown() then lib.frame:Show() end

@@ -1467,7 +1467,9 @@ end
 -- be taken then)
 local function notBlocked(q, questID)
     local req = requirementsOf(questID)
-    for _, list in ipairs({ q and q.blockedBy, req and req[8] }) do
+    -- (false, not nil, for a missing list: ipairs stops at a nil first entry,
+    -- and then the requirements' list was never looked at)
+    for _, list in ipairs({ (q and q.blockedBy) or false, (req and req[8]) or false }) do
         if type(list) == "table" then
             for _, id in ipairs(list) do
                 if questDone(id) or questInLog(id) then return false end
@@ -1527,7 +1529,8 @@ local function takeable(questID, me)
             local have = me.skills[reqSkill]
             if not have then return nil end
             local need = tonumber(req[4]) or 0
-            if type(have) == "number" and need > have then
+            -- (rank not known: not shown as one to take now)
+            if (type(have) == "number" and need > have) or (have == true and need > 1) then
                 local copy = {}
                 for k, v in pairs(q) do copy[k] = v end
                 copy.needRank = need
@@ -1552,28 +1555,49 @@ local function takeable(questID, me)
     return q or {}
 end
 
+-- Professions this character has: skill line ID -> rank (true: rank not
+-- known). Read on login and skill changes too, because inside a tooltip the
+-- game can hand the ranks over as secret values; a secret rank then keeps the
+-- rank read before. nil when the professions can't be read at all.
+local knownSkills
+local function readProfessions()
+    if not (type(GetProfessions) == "function" and type(GetProfessionInfo) == "function") then return knownSkills end
+    local results = { pcall(GetProfessions) }
+    if not results[1] then return knownSkills end
+    local fresh = {}
+    for i = 2, 7 do   -- primary 1, primary 2, archaeology, fishing, cooking, first aid (any may be nil)
+        local index = results[i]
+        if type(index) == "number" and not isSecret(index) then
+            local okInfo, _, _, rank, _, _, _, skillLine = pcall(GetProfessionInfo, index)
+            if okInfo and type(skillLine) == "number" and not isSecret(skillLine) then
+                if type(rank) == "number" and not isSecret(rank) then
+                    fresh[skillLine] = rank
+                else
+                    local before = knownSkills and knownSkills[skillLine]
+                    fresh[skillLine] = type(before) == "number" and before or true
+                end
+            end
+        end
+    end
+    knownSkills = fresh
+    return knownSkills
+end
+
+do
+    local skillWatcher = CreateFrame("Frame")
+    for _, event in ipairs({ "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "SKILL_LINES_CHANGED", "CHAT_MSG_SKILL", "TRADE_SKILL_LIST_UPDATE" }) do
+        pcall(skillWatcher.RegisterEvent, skillWatcher, event)
+    end
+    skillWatcher:SetScript("OnEvent", function() pcall(readProfessions) end)
+end
+
 local function playerInfo()
     local level = (UnitLevel and UnitLevel("player")) or 1
     local _, class, classID = UnitClass("player")
     local raceID = select(3, UnitRace("player"))
     local faction = UnitFactionGroup and UnitFactionGroup("player")
-    -- professions this character has (skill line IDs); nil when unknown
-    local skills
-    if type(GetProfessions) == "function" and type(GetProfessionInfo) == "function" then
-        local results = { pcall(GetProfessions) }
-        if results[1] then
-            skills = {}
-            for i = 2, 7 do   -- primary 1, primary 2, archaeology, fishing, cooking, first aid (any may be nil)
-                local index = results[i]
-                if type(index) == "number" then
-                    local okInfo, _, _, rank, _, _, _, skillLine = pcall(GetProfessionInfo, index)
-                    if okInfo and type(skillLine) == "number" then
-                        skills[skillLine] = (type(rank) == "number" and not isSecret(rank) and rank) or true
-                    end
-                end
-            end
-        end
-    end
+    local okSkills, skills = pcall(readProfessions)
+    if not okSkills then skills = knownSkills end
     return { level = tonumber(level) or 1, class = class, faction = faction, skills = skills,
         raceID = (type(raceID) == "number" and not isSecret(raceID)) and raceID or nil,
         classID = (type(classID) == "number" and not isSecret(classID)) and classID or nil,
@@ -1664,6 +1688,47 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly, kind)
         found[#found + 1] = { text = string.format(ns:L("NPC_TT_MORE"), more), r = 0.6, g = 0.6, b = 0.6 }
     end
     return found
+end
+
+-- For the developer's check in EzWoW-DataDumper (that addon is on this PC
+-- only): the quests an NPC's tooltip lists as ones to take now (a yellow
+-- "!"). The check tests them again with its own code (done, in the log,
+-- requirements), so a mistake here shows up there.
+function QuestLogPins.availableNowAt(npcId)
+    buildNpcQuests()
+    local me = playerInfo()
+    local floorLevel = QuestLogPins.trivialFloor and QuestLogPins.trivialFloor(me.level) or (me.level - 5)
+    local out = {}
+    for questID in pairs((npcGives or {})[npcId] or {}) do
+        local q = takeable(questID, me)
+        local level = q and tonumber(q.lvl) or 0
+        if q and (level <= 0 or level > floorLevel)
+            and not ((q.min or 0) > me.level or q.needPrev or q.needRank) then
+            out[#out + 1] = questID
+        end
+    end
+    return out
+end
+do
+    local devHook = CreateFrame("Frame")
+    pcall(devHook.RegisterEvent, devHook, "PLAYER_LOGIN")
+    devHook:SetScript("OnEvent", function()
+        local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G.IsAddOnLoaded
+        local ok, on = false, false
+        if type(loaded) == "function" then ok, on = pcall(loaded, "EzWoW-DataDumper") end
+        if ok and on then
+            _G.EzWoW_QuestDev = {
+                AvailableAt = function(npcId) return QuestLogPins.availableNowAt(npcId) end,
+                -- every NPC that gives a quest (the check goes through them all)
+                AllGivers = function()
+                    buildNpcQuests()
+                    local out = {}
+                    for npcId in pairs(npcGives or {}) do out[#out + 1] = npcId end
+                    return out
+                end,
+            }
+        end
+    end)
 end
 
 -----------------------------------------------------------------------------
