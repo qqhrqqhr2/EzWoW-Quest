@@ -1673,7 +1673,7 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly, kind)
                 local b = tooHigh and 0.6 or known and 0 or 0.5
                 if again and not tooHigh then r, g, b = 0.35, 0.7, 1 end
                 found[#found + 1] = { order = tooHigh and 3 or known and 1 or 2, level = level, text = text,
-                    r = r, g = g, b = b }
+                    r = r, g = g, b = b, qid = questID, next = tonumber(q.next), prev = prevQuest and prevQuest[questID] }
             end
         end
     end
@@ -1688,6 +1688,43 @@ function QuestLogPins.npcQuestLines(npcId, me, nowOnly, kind)
         found[#found + 1] = { text = string.format(ns:L("NPC_TT_MORE"), more), r = 0.6, g = 0.6, b = 0.6 }
     end
     return found
+end
+
+-- One tooltip may list several NPCs (a map mark over neighbours, the
+-- minimap): each quest is listed once, and a later step of a chain is left
+-- out while an earlier step is listed (the parts of a chain often share one
+-- name, so they looked like the same line twice). blocks: { lines, ... } as
+-- npcQuestLines returns them; changed in place and returned.
+function QuestLogPins.pruneQuestLines(blocks)
+    local listed = {}
+    for _, lines in ipairs(blocks) do
+        for _, l in ipairs(lines) do
+            if l.qid then listed[l.qid] = true end
+        end
+    end
+    local later = {}
+    for _, lines in ipairs(blocks) do
+        for _, l in ipairs(lines) do
+            if l.qid then
+                if l.next and listed[l.next] then later[l.next] = true end
+                if l.prev and listed[l.prev] then later[l.qid] = true end
+            end
+        end
+    end
+    local seen = {}
+    for i, lines in ipairs(blocks) do
+        local kept = {}
+        for _, l in ipairs(lines) do
+            if not l.qid then
+                kept[#kept + 1] = l
+            elseif not seen[l.qid] and not later[l.qid] then
+                seen[l.qid] = true
+                kept[#kept + 1] = l
+            end
+        end
+        blocks[i] = kept
+    end
+    return blocks
 end
 
 -- For the developer's check in EzWoW-DataDumper (that addon is on this PC
@@ -2122,8 +2159,11 @@ local function obtainGiverPin(index)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local me = playerInfo()
         local first = true
-        for _, giver in ipairs(group.givers) do
-            local lines = QuestLogPins.npcQuestLines(giver.id, me, true, giver.kind)
+        local blocks = {}
+        for i, giver in ipairs(group.givers) do blocks[i] = QuestLogPins.npcQuestLines(giver.id, me, true, giver.kind) end
+        QuestLogPins.pruneQuestLines(blocks)
+        for i, giver in ipairs(group.givers) do
+            local lines = blocks[i]
             if #lines > 0 then
                 local name = partnerName(giver.kind, giver.id)
                 if first then GameTooltip:SetText(name, unpack(Theme.accent)) else GameTooltip:AddLine(name, unpack(Theme.accent)) end
@@ -2250,7 +2290,7 @@ if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and
         pcall(function()
             local id = npcIdOf(data.guid)
             if not id then return end
-            local lines = QuestLogPins.npcQuestLines(id)
+            local lines = QuestLogPins.pruneQuestLines({ QuestLogPins.npcQuestLines(id) })[1]
             if #lines == 0 then return end
             for _, l in ipairs(lines) do tooltip:AddLine(l.text, l.r, l.g, l.b) end
             tooltip:AddDoubleLine(" ", "EzWoW - Quest", 0, 0, 0, 0.5, 0.5, 0.5)
@@ -2286,10 +2326,21 @@ local function minimapQuests(tooltip)
         end
     end
     if #blocks == 0 then return end
+    local lists = {}
+    for i, block in ipairs(blocks) do lists[i] = block.lines end
+    QuestLogPins.pruneQuestLines(lists)
+    local any = false
+    for i, block in ipairs(blocks) do
+        block.lines = lists[i]
+        if #block.lines > 0 then any = true end
+    end
+    if not any then return end
     for _, block in ipairs(blocks) do
+        if #block.lines > 0 then
         tooltip:AddLine(" ")
         tooltip:AddLine(block.name, Theme.muted[1], Theme.muted[2], Theme.muted[3])
         for _, l in ipairs(block.lines) do tooltip:AddLine("  " .. l.text, l.r, l.g, l.b) end
+        end
     end
     tooltip:AddDoubleLine(" ", "EzWoW - Quest", 0, 0, 0, 0.5, 0.5, 0.5)
     addingToMinimap = true
