@@ -1069,6 +1069,54 @@ local function canvas()
         or WorldMapFrame
 end
 
+-- objective marks are a "+" on a see-through background: round coloured dots looked
+-- like the party members' class-coloured dots on the map (user 11-20). A mark is two
+-- bars, a dark "+" (outline = true) under a coloured one; it answers the texture calls
+-- the marks make (SetSize, SetVertexColor, SetPoint, ClearAllPoints, Show, Hide).
+local BAR = "Interface\\Buttons\\WHITE8X8"
+local function plusThickness(len)
+    return math.max(2, floor(len * 0.3 + 0.5))
+end
+local PlusMark = {}
+PlusMark.__index = PlusMark
+function PlusMark:SetSize(w)
+    w = tonumber(w) or 0
+    -- (the outline is 3 px longer than the coloured "+" and 1 px wider on each side)
+    local t = self.outline and (plusThickness(w - 3) + 2) or plusThickness(w)
+    self.h:SetSize(w, t)
+    self.v:SetSize(t, w)
+end
+function PlusMark:SetVertexColor(r, g, b, a)
+    self.h:SetVertexColor(r, g, b, a)
+    self.v:SetVertexColor(r, g, b, a)
+end
+function PlusMark:ClearAllPoints()
+    self.h:ClearAllPoints()
+    self.v:ClearAllPoints()
+end
+function PlusMark:SetPoint(...)
+    self.h:SetPoint(...)
+    self.v:SetPoint(...)
+end
+function PlusMark:Show()
+    self.h:Show()
+    self.v:Show()
+end
+function PlusMark:Hide()
+    self.h:Hide()
+    self.v:Hide()
+end
+local function newPlus(parent, layer, sublevel, size, outline)
+    local mark = setmetatable({ outline = outline and true or false }, PlusMark)
+    mark.h = parent:CreateTexture(nil, layer, nil, sublevel)
+    mark.v = parent:CreateTexture(nil, layer, nil, sublevel)
+    mark.h:SetTexture(BAR)
+    mark.v:SetTexture(BAR)
+    mark:SetSize(size)
+    mark:SetPoint("CENTER")
+    return mark
+end
+
 local function newDisc(parent, layer, sublevel, size)
     local tex = parent:CreateTexture(nil, layer, nil, sublevel)
     tex:SetTexture(DISC)
@@ -1117,10 +1165,8 @@ local function showMembers(pin)
         local y = s[2] * (ch / (group.ch or ch))
         local border, fill = memberDots[i * 2 - 1], memberDots[i * 2]
         if not border then
-            border = memberFrame:CreateTexture(nil, "ARTWORK", nil, 1)
-            border:SetTexture(DISC)
-            fill = memberFrame:CreateTexture(nil, "ARTWORK", nil, 2)
-            fill:SetTexture(DISC)
+            border = newPlus(memberFrame, "ARTWORK", 1, size, true)
+            fill = newPlus(memberFrame, "ARTWORK", 2, size, false)
             memberDots[i * 2 - 1], memberDots[i * 2] = border, fill
         end
         border:SetVertexColor(0, 0, 0, 0.9)
@@ -1146,9 +1192,9 @@ local function obtainDot(index)
     setPropagateClicks(pin, false)
     pin:SetSize(DOT_SIZE, DOT_SIZE)
     pin:SetFrameStrata("HIGH")
-    pin.border = newDisc(pin, "ARTWORK", 1, DOT_SIZE)
+    pin.border = newPlus(pin, "ARTWORK", 1, DOT_SIZE, true)
     pin.border:SetVertexColor(0, 0, 0, 0.95)
-    pin.fill = newDisc(pin, "ARTWORK", 2, DOT_SIZE - 3)
+    pin.fill = newPlus(pin, "ARTWORK", 2, DOT_SIZE - 3, false)
     pin:SetScript("OnEnter", function(self)
         if self.group then
             showGroupTooltip(self, self.group)
@@ -1577,9 +1623,9 @@ local function obtainMiniPin(index)
     pin = CreateFrame("Frame", nil, Minimap)
     pin:SetSize(MINIMAP_DOT_SIZE, MINIMAP_DOT_SIZE)
     pin:SetFrameLevel((Minimap:GetFrameLevel() or 1) + 5)
-    pin.border = newDisc(pin, "ARTWORK", 1, MINIMAP_DOT_SIZE)
+    pin.border = newPlus(pin, "ARTWORK", 1, MINIMAP_DOT_SIZE, true)
     pin.border:SetVertexColor(0, 0, 0, 0.95)
-    pin.fill = newDisc(pin, "ARTWORK", 2, MINIMAP_DOT_SIZE - 2)
+    pin.fill = newPlus(pin, "ARTWORK", 2, MINIMAP_DOT_SIZE - 2, false)
     pin:EnableMouse(true)
     setPropagateClicks(pin, true)
     pin:SetScript("OnEnter", function(self) if self.group then showGroupTooltip(self, self.group, "ANCHOR_LEFT") end end)
