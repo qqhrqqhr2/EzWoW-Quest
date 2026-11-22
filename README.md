@@ -28,7 +28,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 
 ### 화면 미리보기
 
-![퀘스트 추적기와 지도 표시](docs/images/ui_ko.png)
+![퀘스트 추적기, 지도 표시, 경험치 창](docs/images/ui_ko.png)
 
 ![설정창](docs/images/settings_ko.png)
 
@@ -212,7 +212,7 @@ All quest features in one addon.
 
 ### Screenshots
 
-![Quest tracker and map marks](docs/images/ui_en.png)
+![Quest tracker, map marks and XP window](docs/images/ui_en.png)
 
 ![Settings window](docs/images/settings_en.png)
 

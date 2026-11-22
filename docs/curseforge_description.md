@@ -9,7 +9,7 @@ CurseForge summary (KO): 길 안내가 되는 퀘스트 추적기, 자동 수락
 
 All quest features in one addon for WoW Forever: a scrollable quest tracker that guides you to the nearest place to go, auto accept and turn-in, a mark on the best-selling reward, party progress messages, quest objective and turn-in spots on the World Map and minimap, and a yellow "!" over quest givers with a quest you can take now.
 
-![Quest tracker and map marks](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/ui_en.png)
+![Quest tracker, map marks and XP window](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/ui_en.png)
 
 ![Settings window](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/settings_en.png)
 
@@ -25,6 +25,7 @@ All quest features in one addon for WoW Forever: a scrollable quest tracker that
 - Quests with a usable item get an item button you can click directly.
 - Drag to move, Ctrl + mouse wheel to scale (50–150%), drag the bottom corner to resize, mouse wheel to scroll.
 - A lock button on the header locks position and size (locked: see-through background, moves only with Ctrl + drag). The background and frame can also be turned off for a text-only list.
+- The frame, background and lock button appear after you keep the mouse on the header for 1 second, and stay while the mouse is on the list.
 - Left-click a quest: quest log and a guide to the nearest place to go (chat line with coordinates and a waypoint; the turn-in spot once the objectives are done) · Ctrl + left-click: quest log only · Shift + left-click: chat link · Alt + left-click: share · right-click: fold objectives · Alt + right-click: hide.
 
 ### Quest automation (off by default)
@@ -84,7 +85,7 @@ Languages: English, 한국어, Deutsch, Français, Español, Русский, 简
 
 WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 가까운 수행 위치로 길을 안내하는 스크롤형 퀘스트 추적기, 자동 수락·완료, 판매가가 가장 높은 보상 표시, 파티 진행 알림, 월드맵과 미니맵의 퀘스트 목표·보고 위치 표시, 지금 받을 수 있는 퀘스트를 주는 NPC의 노란 "!" 표시를 제공합니다.
 
-![퀘스트 추적기와 지도 표시](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/ui_ko.png)
+![퀘스트 추적기, 지도 표시, 경험치 창](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/ui_ko.png)
 
 ![설정창](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/settings_ko.png)
 
@@ -100,6 +101,7 @@ WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 �
 - 사용 아이템이 있는 퀘스트는 아이템 버튼을 눌러 바로 씁니다.
 - 끌어서 이동, Ctrl + 마우스 휠로 크기(50~150%), 아래 모서리를 끌어 가로·세로 크기 조절, 마우스 휠로 스크롤.
 - 머리줄의 자물쇠 버튼으로 위치·크기를 잠급니다(잠기면 배경이 투명해지고 Ctrl + 끌기로만 이동). 배경·테두리를 꺼서 글자만 보이게 할 수도 있습니다.
+- 테두리·배경과 자물쇠 버튼은 머리줄에 마우스를 1초 올려 두면 나오고, 마우스가 목록 안에 있는 동안 유지됩니다.
 - 퀘스트 좌클릭: 퀘스트 로그와 함께 가장 가까운 수행 위치로 길 안내(채팅창에 좌표를 알리고 웨이포인트를 찍음, 목표를 다 채우면 보고 위치) · Ctrl + 좌클릭: 퀘스트 로그만 · Shift + 좌클릭: 채팅 링크 · Alt + 좌클릭: 공유 · 우클릭: 목표 접기 · Alt + 우클릭: 숨기기.
 
 ### 퀘스트 자동화 (처음에는 꺼짐)

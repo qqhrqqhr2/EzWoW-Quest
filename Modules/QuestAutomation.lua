@@ -383,6 +383,8 @@ for event in pairs(HANDLERS) do pcall(eventFrame.RegisterEvent, eventFrame, even
 pcall(eventFrame.RegisterEvent, eventFrame, "QUEST_FINISHED")
 pcall(eventFrame.RegisterEvent, eventFrame, "GOSSIP_CLOSED")
 pcall(eventFrame.RegisterEvent, eventFrame, "GET_ITEM_INFO_RECEIVED")
+-- (C_Item.RequestLoadItemDataByID answers only with ITEM_DATA_LOAD_RESULT on this client, 2026-11-22)
+pcall(eventFrame.RegisterEvent, eventFrame, "ITEM_DATA_LOAD_RESULT")
 -- quest log full (the game's error), and a quest leaving or joining the log
 for _, event in ipairs({ "UI_ERROR_MESSAGE", "QUEST_REMOVED", "QUEST_TURNED_IN", "QUEST_ACCEPTED" }) do
     pcall(eventFrame.RegisterEvent, eventFrame, event)
@@ -408,7 +410,7 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
         hookQuestInfoDisplay()
         if displayHooked then pcall(eventFrame.UnregisterEvent, eventFrame, "ADDON_LOADED") end
         return
-    elseif event == "GET_ITEM_INFO_RECEIVED" then
+    elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
         onItemInfoReceived()
         return
     end
