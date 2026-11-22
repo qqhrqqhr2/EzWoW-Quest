@@ -749,6 +749,26 @@ function ObjectiveTrackerController.showQuestOverlay(line)
     overlay:Show()
 end
 
+-- The overlay goes over the hovered line, so the line gets OnLeave right after
+-- OnEnter; the hover stays only while the mouse is really on that overlay. The
+-- overlay leaves the +/- badge free, so a line left over the badge (the way out
+-- to the left) never reached the overlay's OnLeave: the tooltip stayed up and,
+-- set to follow the mouse, went along across the screen (2026-11-22).
+function ObjectiveTrackerController.onQuestLineLeave(line)
+    local overlay = questOverlay
+    if overlay and overlay:IsShown() and overlay.line == line then
+        local onOverlay = overlay:IsMouseOver()
+        if not onOverlay and type(GetMouseFoci) == "function" then
+            local ok, foci = pcall(GetMouseFoci)
+            onOverlay = ok and type(foci) == "table" and foci[1] == overlay
+        end
+        if onOverlay then return end
+    end
+    if line.hl then line.hl:Hide() end
+    if GameTooltip then GameTooltip:Hide() end
+    if overlay and overlay.line == line then ObjectiveTrackerController.hideQuestOverlay() end
+end
+
 -- After the list is redrawn: keep the overlay on its line if the cursor is
 -- still there (the target may have changed), else take it away.
 function ObjectiveTrackerController.refreshQuestOverlay()
@@ -1418,12 +1438,7 @@ function ObjectiveTrackerController.acquireTrackerRowWidget(index)
         end
         ObjectiveTrackerController.showQuestOverlay(self)
     end)
-    line:SetScript("OnLeave", function(self)
-        -- the overlay just went over this line: it keeps the hover
-        if questOverlay and questOverlay:IsShown() and questOverlay.line == self then return end
-        self.hl:Hide()
-        if GameTooltip then GameTooltip:Hide() end
-    end)
+    line:SetScript("OnLeave", function(self) ObjectiveTrackerController.onQuestLineLeave(self) end)
 
     linePool[index] = line
     return line
@@ -2333,18 +2348,35 @@ trackerEvents:SetScript("OnEvent", function(_, event, arg1, arg2)
     ns:ScheduleTrackerUpdate()
 end)
 
--- The mouse anywhere on the list shows its frame, background and lock button;
--- leaving it puts back the normal look (see-through while locked).
+-- The mouse kept on the header (the addon's name) for HEADER_HOVER_DELAY
+-- seconds shows the list's frame, background and lock button, like the other
+-- EzWoW windows; they stay while the mouse is anywhere on the list, and leaving
+-- it puts back the normal look (see-through while locked). The quest lines, or
+-- passing over the header, do not bring them up (2026-11-22). headerSeconds:
+-- how long the mouse has been on the header (nil when it is not there).
+local HEADER_HOVER_DELAY = 1
+function ObjectiveTrackerController.hoverWanted(active, headerSeconds, onList, busy)
+    if busy then return true end
+    if active then return onList and true or false end
+    return type(headerSeconds) == "number" and headerSeconds >= HEADER_HOVER_DELAY
+end
+
 local hoverWatch = CreateFrame("Frame")
 local hoverElapsed = 0
+local headerSince = nil
 hoverWatch:SetScript("OnUpdate", function(_, elapsed)
     hoverElapsed = hoverElapsed + (elapsed or 0)
     if hoverElapsed < 0.1 then return end
     hoverElapsed = 0
     local over = false
     if trackerFrame and trackerFrame:IsShown() then
-        over = trackerFrame:IsMouseOver() or (questOverlay and questOverlay:IsShown() and questOverlay:IsMouseOver()) or false
-        if trackerFrame.isDragging or hasResizingTracker then over = true end
+        local onHeader = headerBtn and headerBtn:IsShown() and headerBtn:IsMouseOver()
+        if onHeader then headerSince = headerSince or GetTime() else headerSince = nil end
+        local onList = trackerFrame:IsMouseOver() or (questOverlay and questOverlay:IsShown() and questOverlay:IsMouseOver())
+        over = ObjectiveTrackerController.hoverWanted(ObjectiveTrackerController.hoverActive,
+            headerSince and (GetTime() - headerSince) or nil, onList, trackerFrame.isDragging or hasResizingTracker)
+    else
+        headerSince = nil
     end
     if over ~= (ObjectiveTrackerController.hoverActive or false) then
         ObjectiveTrackerController.hoverActive = over

@@ -45,7 +45,7 @@ WoW Forever (`Interface: 16001`) · `/ezq` · `/퀘스트`
 
 | 번호 | 기능 | 설명 |
 |---|---|---|
-| ① | 추적기 머리줄 | 수행 중인 퀘스트 수/최대 수. 좌클릭: 목록 접기·펼치기, 우클릭: 설정창. 마우스를 올리면 자물쇠 버튼이 나옵니다(아래 참고) |
+| ① | 추적기 머리줄 | 수행 중인 퀘스트 수/최대 수. 좌클릭: 목록 접기·펼치기, 우클릭: 설정창. 마우스를 1초 동안 올려 두면 테두리·배경과 자물쇠 버튼이 나오고, 마우스가 목록 안에 있는 동안 유지됩니다(아래 참고) |
 | ② | 지역 헤더 | 퀘스트를 지역별로 묶습니다. 클릭하면 그 지역을 접습니다 |
 | ③ | 퀘스트 아이템 버튼 | 사용 아이템이 있는 퀘스트는 왼쪽 버튼을 눌러 바로 씁니다 |
 | ④ | 퀘스트 줄 | `[레벨]`을 난이도 색으로(던전은 `[16D]`, 정예는 `[21+]`처럼 표시), `(완료)`·`(실패)`를 바로 표시합니다. 파티 중에는 줄 끝에 같은 퀘스트를 가진 파티원 수(`[2/2]` 초록 = 모두, `[1/2]` 보라 = 일부, `[0/2]` 회색 = 없음)를 보여 주고, 마우스를 올리면 파티원별로 나옵니다 |
@@ -229,7 +229,7 @@ All quest features in one addon.
 
 | No. | Feature | Description |
 |---|---|---|
-| ① | Tracker header | Active quests / maximum. Left-click: collapse or expand, right-click: settings. A lock button appears on hover (see below) |
+| ① | Tracker header | Active quests / maximum. Left-click: collapse or expand, right-click: settings. Keeping the mouse on it for 1 second brings up the frame, background and lock button, which stay while the mouse is on the list (see below) |
 | ② | Zone header | Quests are grouped by zone. Click a zone to collapse it |
 | ③ | Quest item button | Quests with a usable item get a button on the left; click it to use the item |
 | ④ | Quest line | `[Lv]` in difficulty colour (dungeons read `[16D]`, elite quests `[21+]`), `(Complete)` and `(Failed)` at once. In a party the line ends with how many members also have the quest (`[2/2]` green = all, `[1/2]` violet = some, `[0/2]` grey = none); hover to see each member |
