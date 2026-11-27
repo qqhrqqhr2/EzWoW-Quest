@@ -9,9 +9,9 @@ CurseForge summary (KO): 길 안내가 되는 퀘스트 추적기, 자동 수락
 
 All quest features in one addon for WoW Forever: a scrollable quest tracker that guides you to the nearest place to go, auto accept and turn-in, a mark on the best-selling reward, party progress messages, quest objective and turn-in spots on the World Map and minimap, and a yellow "!" over quest givers with a quest you can take now.
 
-![Quest tracker, map marks and XP window](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/ui_en.png)
+![Quest tracker, map marks and XP window](https://raw.githubusercontent.com/ezwow-addons/EzWoW-Quest/master/docs/images/ui_en.png)
 
-![Settings window](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/settings_en.png)
+![Settings window](https://raw.githubusercontent.com/ezwow-addons/EzWoW-Quest/master/docs/images/settings_en.png)
 
 *In-game screenshots with the addon set to English. The game client is Korean, so game text such as zone, item and spell names stays Korean. Character and player names and chat text are blurred.*
 
@@ -85,9 +85,9 @@ Languages: English, 한국어, Deutsch, Français, Español, Русский, 简
 
 WoW Forever용 퀘스트 기능을 한곳에 모은 애드온입니다. 가장 가까운 수행 위치로 길을 안내하는 스크롤형 퀘스트 추적기, 자동 수락·완료, 판매가가 가장 높은 보상 표시, 파티 진행 알림, 월드맵과 미니맵의 퀘스트 목표·보고 위치 표시, 지금 받을 수 있는 퀘스트를 주는 NPC의 노란 "!" 표시를 제공합니다.
 
-![퀘스트 추적기, 지도 표시, 경험치 창](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/ui_ko.png)
+![퀘스트 추적기, 지도 표시, 경험치 창](https://raw.githubusercontent.com/ezwow-addons/EzWoW-Quest/master/docs/images/ui_ko.png)
 
-![설정창](https://raw.githubusercontent.com/qqhrqqhr2/EzWoW-Quest/master/docs/images/settings_ko.png)
+![설정창](https://raw.githubusercontent.com/ezwow-addons/EzWoW-Quest/master/docs/images/settings_ko.png)
 
 *실제 게임 화면입니다(WoW Forever, 한국어 클라이언트). 캐릭터 · 다른 플레이어 이름과 채팅 내용은 가렸습니다.*
 
